@@ -10,7 +10,9 @@ export interface ProjectRecord {
 }
 
 export interface GenerationMeta {
+  promptTokens: number | null
   completionTokens: number | null
+  totalTokens: number | null
   tokensPerSecond: number | null
   durationSeconds: number | null
   finishReason: string | null

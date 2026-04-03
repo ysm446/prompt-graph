@@ -400,7 +400,7 @@ function GraphChatApp() {
       createdAt: now,
       updatedAt: now,
       position: position ? base : { x: base.x + 40, y: base.y + 160 },
-      size: { width: 288, height: 180 }
+      size: { width: 480, height: 360 }
     }
     applySnapshot({ ...snapshot, nodes: [...snapshot.nodes, node] })
     setIsProjectDirty(true)
@@ -890,7 +890,7 @@ function GraphChatApp() {
           >
             <MenuAction label="Add Text" onClick={() => void addNode('text', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Context" onClick={() => void addNode('context', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
-            <MenuAction label="Add Global Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
+            <MenuAction label="Add Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
           </div>
         )}
         {nodeMenu && nodeMenuNode && (
@@ -1069,6 +1069,7 @@ function GraphChatApp() {
             node={selectedNode}
             disabled={generation?.nodeId === selectedNode.id}
             currentModelName={settings?.selectedModelName ?? null}
+            contextLength={settings?.contextLength ?? null}
             onChange={(updated) => {
               mutateLocalNode(updated)
               void persistNode(updated)
@@ -1234,6 +1235,7 @@ function NodeEditor({
   node,
   disabled,
   currentModelName,
+  contextLength,
   onChange,
   onDuplicate,
   onClear,
@@ -1242,11 +1244,22 @@ function NodeEditor({
   node: GraphNodeRecord
   disabled: boolean
   currentModelName: string | null
+  contextLength: number | null
   onChange: (node: GraphNodeRecord) => void
   onDuplicate: () => void
   onClear: () => void
   onDelete: () => void
 }) {
+  const totalTokens = node.generationMeta?.totalTokens ?? null
+  const contextUsageRatio =
+    totalTokens !== null && contextLength && contextLength > 0
+      ? Math.min(totalTokens / contextLength, 1)
+      : null
+  const contextUsagePercent =
+    contextUsageRatio !== null
+      ? Math.max(0, Number((contextUsageRatio * 100).toFixed(1)))
+      : null
+
   return (
     <div className="inspector-scrollbar flex-1 overflow-y-auto p-5">
       <label className="mb-4 block">
@@ -1270,11 +1283,22 @@ function NodeEditor({
         </label>
       )}
       {node.generationMeta && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
           {node.generationMeta.tokensPerSecond !== null && <MetaItem icon={<BoltIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.tokensPerSecond.toFixed(1)} tok/sec`} />}
-          {node.generationMeta.completionTokens !== null && <MetaItem icon={<TokenIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.completionTokens} tokens`} />}
+          {node.generationMeta.completionTokens !== null && <MetaItem icon={<TokenIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.completionTokens} output`} />}
           {node.generationMeta.durationSeconds !== null && <MetaItem icon={<ClockIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.durationSeconds.toFixed(2)}s`} />}
           {node.generationMeta.finishReason && <MetaItem icon={<FlagIcon className="h-3.5 w-3.5" />} label={`Finish reason: ${node.generationMeta.finishReason}`} />}
+          </div>
+          {totalTokens !== null && contextLength && contextUsagePercent !== null && (
+            <div className="mt-3 flex items-center gap-3 text-xs text-[var(--text-dim)]">
+              <ContextUsageGauge percent={contextUsagePercent} />
+              <div className="leading-5">
+                <div>{totalTokens} / {contextLength} tokens</div>
+                <div className="text-[var(--text-faint)]">Context usage {contextUsagePercent.toFixed(1)}%</div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div className="inline-flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
@@ -1419,6 +1443,34 @@ function ToolbarButton({ onClick, label }: { onClick: () => void; label: string 
 
 function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
   return <span className="inline-flex items-center gap-1.5">{icon}<span>{label}</span></span>
+}
+
+function ContextUsageGauge({ percent }: { percent: number }) {
+  const normalizedPercent = Math.max(0, Math.min(percent, 100))
+  const radius = 11
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - normalizedPercent / 100)
+
+  return (
+    <div className="flex items-center gap-2 text-[var(--accent)]">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <circle cx="17" cy="17" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+        <circle
+          cx="17"
+          cy="17"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform="rotate(-90 17 17)"
+        />
+      </svg>
+      <span className="text-sm font-medium">{normalizedPercent.toFixed(1)}%</span>
+    </div>
+  )
 }
 
 function SidebarResizeHandle({ onMouseDown }: { onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void }) {

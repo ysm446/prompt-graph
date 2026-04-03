@@ -232,7 +232,9 @@ async function streamGeneration(input: {
     let buffer = ''
     let content = input.initialContent
     let finishReason: string | null = null
+    let promptTokens: number | null = null
     let completionTokens: number | null = null
+    let totalTokens: number | null = null
     const startedAt = Date.now()
     let workingSnapshot = input.snapshot
     while (true) {
@@ -248,10 +250,12 @@ async function streamGeneration(input: {
           if (data === '[DONE]') continue
           const parsed = JSON.parse(data) as {
             choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>
-            usage?: { completion_tokens?: number }
+            usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
           }
           finishReason = parsed.choices?.[0]?.finish_reason ?? finishReason
+          promptTokens = parsed.usage?.prompt_tokens ?? promptTokens
           completionTokens = parsed.usage?.completion_tokens ?? completionTokens
+          totalTokens = parsed.usage?.total_tokens ?? totalTokens
           const delta = parsed.choices?.[0]?.delta?.content ?? ''
           if (!delta) continue
           content += delta
@@ -275,7 +279,9 @@ async function streamGeneration(input: {
       }
     }
     const generationMeta = buildGenerationMeta({
+      promptTokens,
       completionTokens,
+      totalTokens,
       durationMs: Date.now() - startedAt,
       finishReason
     })
@@ -313,7 +319,7 @@ function updateSnapshotNode(snapshot: ProjectSnapshot, nodeId: string, patch: Pa
     nodes: snapshot.nodes.map((node) => node.id === nodeId ? { ...node, ...patch, updatedAt: new Date().toISOString() } : node)
   }
 }
-function buildGenerationMeta(input: { completionTokens: number | null; durationMs: number; finishReason: string | null }) {
+function buildGenerationMeta(input: { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null; durationMs: number; finishReason: string | null }) {
   const durationSeconds = input.durationMs > 0 ? Number((input.durationMs / 1000).toFixed(2)) : null
   const tokensPerSecond =
     input.completionTokens !== null && durationSeconds && durationSeconds > 0
@@ -321,7 +327,9 @@ function buildGenerationMeta(input: { completionTokens: number | null; durationM
       : null
 
   return {
+    promptTokens: input.promptTokens,
     completionTokens: input.completionTokens,
+    totalTokens: input.totalTokens ?? ((input.promptTokens !== null && input.completionTokens !== null) ? input.promptTokens + input.completionTokens : null),
     tokensPerSecond,
     durationSeconds,
     finishReason: input.finishReason
