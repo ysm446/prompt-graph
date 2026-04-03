@@ -1104,9 +1104,9 @@ function GraphChatApp() {
           }}
           defaultEdgeOptions={{ style: edgeStyleForHandle('text'), interactionWidth: 28 }}
         >
-          {isMiniMapVisible && <MiniMap pannable zoomable style={{ backgroundColor: '#181b23' }} nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
+          {isMiniMapVisible && <MiniMap pannable zoomable nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
           <Background gap={GRID_SIZE} size={1.4} color="#394154" />
-          <Controls />
+          <Controls showInteractive={false} />
         </ReactFlow>
       </main>
 

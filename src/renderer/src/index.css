@@ -52,9 +52,10 @@ textarea {
 }
 
 .react-flow__minimap {
-  background: rgba(17, 19, 24, 0.96);
+  background: var(--bg-canvas);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .react-flow__minimap-mask {
