@@ -206,6 +206,7 @@ function GraphChatApp() {
       id: edge.id,
       source: edge.sourceId,
       target: edge.targetId,
+      zIndex: 0,
       selected: edge.id === selectedEdgeId,
       animated: false,
       style: edge.id === selectedEdgeId
@@ -918,8 +919,8 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const node = data.graphNode
   const colors = {
     text: 'border-[var(--border-strong)] bg-[var(--bg-card)]',
-    context: 'border-[rgba(110,120,255,0.30)] bg-[rgba(110,120,255,0.10)]',
-    instruction: 'border-[rgba(186,85,232,0.30)] bg-[rgba(186,85,232,0.10)]'
+    context: 'border-[rgb(90,100,210)] bg-[rgb(37,40,66)]',
+    instruction: 'border-[rgb(156,76,196)] bg-[rgb(58,37,74)]'
   } as const
 
   return (

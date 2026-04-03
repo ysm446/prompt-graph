@@ -82,6 +82,19 @@ textarea {
   fill: currentColor;
 }
 
+.react-flow__edges,
+.react-flow__edge-labels {
+  z-index: 0 !important;
+}
+
+.react-flow__nodes {
+  z-index: 1 !important;
+}
+
+.react-flow__node {
+  z-index: auto !important;
+}
+
 .inspector-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #34384a transparent;
