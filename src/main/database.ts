@@ -1,4 +1,4 @@
-﻿import Database from 'better-sqlite3'
+import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -84,7 +84,7 @@ export class GraphRepository {
       CREATE TABLE IF NOT EXISTS nodes (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        type TEXT NOT NULL CHECK(type IN ('text', 'context', 'instruction')),
+        type TEXT NOT NULL CHECK(type IN ('text', 'context', 'instruction', 'local_instruction')),
         title TEXT NOT NULL DEFAULT '',
         content TEXT NOT NULL DEFAULT '',
         instruction TEXT,
@@ -109,6 +109,7 @@ export class GraphRepository {
     `)
     this.ensureNodeColumns()
     this.ensureNodePositionColumns()
+    this.ensureNodeTypeSupport()
   }
 
   listProjects(): ProjectRecord[] {
@@ -325,6 +326,59 @@ export class GraphRepository {
       this.db.exec(`ALTER TABLE node_positions ADD COLUMN height REAL NOT NULL DEFAULT ${DEFAULT_NODE_HEIGHT};`)
     }
   }
+
+  private ensureNodeTypeSupport(): void {
+    const row = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'nodes'").get() as { sql: string } | undefined
+    if (row?.sql?.includes("'local_instruction'")) {
+      return
+    }
+
+    this.db.exec('PRAGMA foreign_keys = OFF;')
+    this.db.transaction(() => {
+      this.db.exec(`
+        ALTER TABLE node_positions RENAME TO node_positions_legacy;
+        ALTER TABLE edges RENAME TO edges_legacy;
+        ALTER TABLE nodes RENAME TO nodes_legacy;
+        CREATE TABLE nodes (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          type TEXT NOT NULL CHECK(type IN ('text', 'context', 'instruction', 'local_instruction')),
+          title TEXT NOT NULL DEFAULT '',
+          content TEXT NOT NULL DEFAULT '',
+          instruction TEXT,
+          model TEXT,
+          is_generated INTEGER NOT NULL DEFAULT 0,
+          generation_meta TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE edges (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          source_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+          target_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+          UNIQUE(source_id, target_id)
+        );
+        CREATE TABLE node_positions (
+          node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+          x REAL NOT NULL,
+          y REAL NOT NULL,
+          width REAL NOT NULL,
+          height REAL NOT NULL
+        );
+        INSERT INTO nodes (id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at)
+        SELECT id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at FROM nodes_legacy;
+        INSERT INTO edges (id, project_id, source_id, target_id)
+        SELECT id, project_id, source_id, target_id FROM edges_legacy;
+        INSERT INTO node_positions (node_id, x, y, width, height)
+        SELECT node_id, x, y, width, height FROM node_positions_legacy;
+        DROP TABLE node_positions_legacy;
+        DROP TABLE edges_legacy;
+        DROP TABLE nodes_legacy;
+      `)
+    })()
+    this.db.exec('PRAGMA foreign_keys = ON;')
+  }
 }
 
 function mapProject(row: ProjectRow): ProjectRecord {
@@ -371,3 +425,5 @@ function wouldCreateCycle(sourceId: string, targetId: string, edges: GraphEdgeRe
   }
   return false
 }
+
+

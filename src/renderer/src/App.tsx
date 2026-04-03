@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Background,
   Controls,
@@ -753,17 +753,13 @@ function GraphChatApp() {
       )}
 
       <main ref={mainRef} className="relative flex-1">
-        <div className="absolute bottom-4 left-4 z-20 rounded-full border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm shadow-sm">
-          <span>{status}</span>
-          {settings && <span className="ml-3 text-[var(--text-dim)]">{settings.llamaModelAlias}</span>}
-        </div>
         {error && <div className="absolute right-4 top-4 z-20 max-w-md rounded-2xl border border-red-500/40 bg-red-950/70 px-4 py-3 text-sm text-red-200 shadow">{error}</div>}
         {!hasNodes && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-10">
             <div className="max-w-xl rounded-[2rem] border border-[var(--border-strong)] bg-[rgba(17,19,24,0.9)] p-8 shadow-xl backdrop-blur-sm">
               <div className="text-xs uppercase tracking-[0.3em] text-[var(--text-dim)]">Getting Started</div>
               <h2 className="mt-2 font-serif text-3xl font-semibold">Build your graph from connected nodes.</h2>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-dim)]">Right-click the canvas to add nodes, then connect context, instruction, and text nodes to shape the output.</p>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-dim)]">Right-click the canvas to add nodes, then connect context, global instruction, local instruction, and text nodes to shape the output.</p>
             </div>
           </div>
         )}
@@ -775,7 +771,8 @@ function GraphChatApp() {
           >
             <MenuAction label="Add Text" onClick={() => void addNode('text', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Context" onClick={() => void addNode('context', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
-            <MenuAction label="Add Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
+            <MenuAction label="Add Global Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
+            <MenuAction label="Add Local Instruction" onClick={() => void addNode('local_instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
           </div>
         )}
         {nodeMenu && nodeMenuNode && (
@@ -947,7 +944,7 @@ function GraphChatApp() {
       <section style={{ width: rightInspectorWidth }} className="flex shrink-0 flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)]">
         <div className="border-b border-[var(--border)] px-5 py-3">
           <h2 className="font-serif text-[18px] font-semibold">{selectedNode?.title || 'Properties'}</h2>
-          <p className="mt-1 text-[12px] text-[var(--text-dim)]">{selectedNode ? selectedNode.type : 'General settings'}</p>
+          <p className="mt-1 text-[12px] text-[var(--text-dim)]">{selectedNode ? defaultTitle(selectedNode.type) : 'General settings'}</p>
         </div>
         {selectedNode ? (
           <NodeEditor
@@ -995,11 +992,29 @@ function GraphChatApp() {
 
 function GraphNodeCard({ data }: { data: AppNodeData }) {
   const node = data.graphNode
+  const [draftContent, setDraftContent] = useState(node.content)
+  const [isComposing, setIsComposing] = useState(false)
+  const wasEditingRef = useRef(data.isEditing)
   const colors = {
     text: 'border-[var(--border-strong)] bg-[var(--bg-card)]',
     context: 'border-[rgb(90,100,210)] bg-[rgba(37,40,66,0.8)]',
-    instruction: 'border-[rgb(156,76,196)] bg-[rgba(58,37,74,0.8)]'
+    instruction: 'border-[rgb(156,76,196)] bg-[rgba(58,37,74,0.8)]',
+    local_instruction: 'border-[rgb(214,108,186)] bg-[rgba(74,42,71,0.8)]'
   } as const
+
+  useEffect(() => {
+    if (node.id !== data.graphNode.id) return
+    if (!data.isEditing) {
+      setDraftContent(node.content)
+    }
+    wasEditingRef.current = data.isEditing
+  }, [node.id, node.content, data.isEditing])
+
+  function commitDraftContent() {
+    if (draftContent !== node.content) {
+      data.onChange({ ...node, content: draftContent })
+    }
+  }
 
   return (
     <div className={`relative h-full w-full rounded-3xl border-2 px-4 py-3 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
@@ -1024,15 +1039,23 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
       <div className="flex h-full flex-col">
         <div className="mb-2 flex items-start justify-between gap-2">
           <button className="nodrag nopan text-left" onClick={() => data.onSelect(node.id)}>
-            <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{node.type}</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{displayNodeTypeLabel(node.type)}</div>
             <div className="font-serif text-lg font-semibold">{node.title || 'Untitled'}</div>
           </button>
-          {node.type === 'text' && <button className="nodrag nopan rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--accent-hover)]" onClick={() => data.onGenerate(node.id)}>生成 -&gt;</button>}
+          {node.type === 'text' && <button className="nodrag nopan rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--accent-hover)]" onClick={() => data.onGenerate(node.id)}>生成</button>}
         </div>
         {data.isEditing ? (
           <textarea
-            value={node.content}
-            onChange={(event) => data.onChange({ ...node, content: event.target.value })}
+            onChange={(event) => setDraftContent(event.target.value)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={(event) => {
+              setIsComposing(false)
+              setDraftContent(event.currentTarget.value)
+            }}
+            onBlur={() => {
+              setIsComposing(false)
+              commitDraftContent()
+            }}
             onMouseDown={(event) => event.stopPropagation()}
             placeholder="No content yet."
             className="node-scrollbar nodrag nopan flex-1 resize-none overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[rgba(0,0,0,0.14)] px-3 py-2 text-sm leading-6 text-[var(--text)] outline-none"
@@ -1043,7 +1066,14 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
         <div className="mt-3 flex justify-between text-xs text-[var(--text-dim)]">
           <div className="flex items-center gap-3">
             <button className="nodrag nopan" onClick={() => data.onOpenReader(node.id)}>Reader</button>
-            <button className="nodrag nopan" onClick={() => (data.isEditing ? data.onStopEdit() : data.onStartEdit(node.id))}>
+            <button className="nodrag nopan" onClick={() => {
+              if (data.isEditing) {
+                commitDraftContent()
+                data.onStopEdit()
+              } else {
+                data.onStartEdit(node.id)
+              }
+            }}>
               {data.isEditing ? 'Done' : 'Edit'}
             </button>
           </div>
@@ -1154,7 +1184,7 @@ function GeneralInspector({
                 value={pendingContextLength}
                 onChange={(event) => setPendingContextLength(Number(event.target.value) || 4096)}
                 onBlur={() => onChangeContextLength(pendingContextLength)}
-                className="h-8 w-[102px] rounded-[10px] border border-[var(--border-strong)] bg-[rgba(28,31,43,0.88)] px-3 py-1.5 text-right text-[13px] text-[var(--text)] outline-none"
+                className="h-7 w-[94px] rounded-[9px] border border-[var(--border-strong)] bg-[rgba(28,31,43,0.88)] px-2.5 py-1 text-right text-[12px] text-[var(--text)] outline-none"
               />
             </div>
           </div>
@@ -1186,10 +1216,10 @@ function GeneralInspector({
             role="switch"
             aria-checked={isMiniMapVisible}
             onClick={onToggleMiniMap}
-            className={`relative h-[24px] w-[42px] rounded-full transition ${isMiniMapVisible ? 'bg-[rgba(124,90,247,0.24)]' : 'bg-[rgba(28,31,43,0.88)]'}`}
+            className={`relative h-[22px] w-[38px] rounded-full transition ${isMiniMapVisible ? 'bg-[rgba(124,90,247,0.24)]' : 'bg-[rgba(28,31,43,0.88)]'}`}
           >
             <span
-              className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-[var(--text)] transition ${isMiniMapVisible ? 'left-[21px]' : 'left-[3px]'}`}
+              className={`absolute top-[3px] h-[16px] w-[16px] rounded-full bg-[var(--text)] transition ${isMiniMapVisible ? 'left-[19px]' : 'left-[3px]'}`}
             />
           </button>
         </div>
@@ -1393,9 +1423,22 @@ function defaultTitle(type: NodeType): string {
     case 'context':
       return 'Context'
     case 'instruction':
-      return 'Instruction'
+      return 'Global Instruction'
+    case 'local_instruction':
+      return 'Local Instruction'
     default:
       return 'Text'
+  }
+}
+
+function displayNodeTypeLabel(type: NodeType): string {
+  switch (type) {
+    case 'instruction':
+      return 'global instruction'
+    case 'local_instruction':
+      return 'local instruction'
+    default:
+      return type
   }
 }
 
@@ -1407,7 +1450,7 @@ function getMiniMapNodeColor(node: Node<AppNodeData>): string {
   const type = node.data?.graphNode.type
   if (type === 'context') return '#3a315f'
   if (type === 'instruction') return '#5b2d5d'
-  return '#2a2745'
+  if (type === 'local_instruction') return '#6c3d63'
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -1455,6 +1498,7 @@ function traverse(nodeId: string, nodeMap: Map<string, GraphNodeRecord>, parentM
 }
 
 export default App
+
 
 
 

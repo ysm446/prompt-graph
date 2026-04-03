@@ -1,4 +1,4 @@
-export type NodeType = 'text' | 'context' | 'instruction'
+export type NodeType = 'text' | 'context' | 'instruction' | 'local_instruction'
 
 export interface ProjectRecord {
   id: string
@@ -78,6 +78,7 @@ export interface UiPreferences {
     interface: boolean
   }
 }
+
 
 
 

@@ -282,7 +282,14 @@ function collectContext(nodeId: string, nodes: GraphNodeRecord[], edges: GraphEd
   const self = nodeMap.get(nodeId)
   const upstream = ordered.filter((node) => node.id !== nodeId)
   const directParents = (parentMap.get(nodeId) ?? []).map((id) => nodeMap.get(id)).filter((value): value is GraphNodeRecord => Boolean(value))
-  const systemParts = upstream.filter((node) => node.type === 'instruction').map((node) => node.content.trim()).filter(Boolean)
+  const globalInstructionParts = upstream
+    .filter((node) => node.type === 'instruction')
+    .map((node) => node.content.trim())
+    .filter(Boolean)
+  const localInstructionParts = directParents
+    .filter((node) => node.type === 'local_instruction')
+    .map((node) => node.content.trim())
+    .filter(Boolean)
   const directParentTexts = directParents
     .filter((node) => node.type === 'text' && node.content.trim())
     .map((node, index) => `# Direct Parent Text ${index + 1}${node.title ? `: ${node.title}` : ''}
@@ -302,7 +309,7 @@ Write the final content for this target node.`
 Write the final content for this target node.`
 
   return {
-    systemPrompt: systemParts.join('\\n\\n') || 'You are a helpful writing assistant.',
+    systemPrompt: [...globalInstructionParts, ...localInstructionParts].join('\\n\\n') || 'You are a helpful writing assistant.',
     userContext: [
       directParentTexts.length > 0 ? 'Use the direct parent texts below as the highest-priority source material.' : '',
       ...directParentTexts,
@@ -365,5 +372,6 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     }
   }
 }
+
 
 

@@ -1,4 +1,4 @@
-﻿import type { AppSettings, GraphNodeRecord, ProjectRecord, ProjectSnapshot, UiPreferences } from '../main/types'
+import type { AppSettings, GraphNodeRecord, ProjectRecord, ProjectSnapshot, UiPreferences } from '../main/types'
 
 export interface GraphChatApi {
   bootstrap(): Promise<{ projects: ProjectRecord[]; snapshot: ProjectSnapshot; settings: AppSettings; uiPreferences: UiPreferences }>
@@ -13,7 +13,7 @@ export interface GraphChatApi {
   openProject(id: string): Promise<ProjectSnapshot>
   createNode(input: {
     projectId: string
-    type: 'text' | 'context' | 'instruction'
+    type: 'text' | 'context' | 'instruction' | 'local_instruction'
     title?: string
     content?: string
     instruction?: string | null
@@ -55,5 +55,6 @@ declare global {
     graphChat: GraphChatApi
   }
 }
+
 
 
