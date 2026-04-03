@@ -505,7 +505,23 @@ function GraphChatApp() {
   const nodeMenuNode = nodeMenu ? snapshotRef.current?.nodes.find((node) => node.id === nodeMenu.nodeId) ?? null : null
 
   return (
-    <div className="flex h-screen bg-[#0b0d12] text-stone-100">
+    <div className="flex h-screen flex-col bg-[#0b0d12] text-stone-100">
+      <header className="relative z-30 border-b border-slate-800 bg-slate-950/90 px-4 py-1">
+        <div className="relative flex min-h-[34px] items-center justify-center px-2">
+          {generation && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <ToolbarButton onClick={() => void stopGeneration()} label="Stop" />
+            </div>
+          )}
+          <div className="max-w-full">
+            <ModelSelectorButton
+              onClick={() => void openModelModal()}
+              label={settings ? (isModelLoaded ? displayModelName(settings.selectedModelName) : 'Load model') : 'Load model'}
+            />
+          </div>
+        </div>
+      </header>
+      <div className="flex min-h-0 flex-1">
       <aside className="flex w-72 flex-col border-r border-slate-800 bg-slate-950/90">
         <div className="border-b border-slate-800 px-5 py-4">
           <h1 className="font-serif text-2xl font-semibold">Graph Chat</h1>
@@ -547,13 +563,6 @@ function GraphChatApp() {
       </aside>
 
       <main ref={mainRef} className="relative flex-1">
-        <div className="absolute left-4 top-4 z-20 flex flex-wrap gap-2">
-          <ToolbarButton onClick={() => void addNode('text')} label="+ Text" />
-          <ToolbarButton onClick={() => void addNode('context')} label="+ Context" />
-          <ToolbarButton onClick={() => void addNode('instruction')} label="+ Instruction" />
-          <ToolbarButton onClick={() => void openModelModal()} label={settings ? (isModelLoaded ? `Model: ${displayModelName(settings.selectedModelName)}` : 'モデルをロードしてください') : 'モデルをロードしてください'} />
-          {generation && <ToolbarButton onClick={() => void stopGeneration()} label="Stop" />}
-        </div>
         <div className="absolute bottom-4 left-4 z-20 rounded-full border border-slate-700 bg-slate-900/90 px-4 py-2 text-sm shadow-sm">
           <span>{status}</span>
           {settings && <span className="ml-3 text-slate-400">{settings.llamaModelAlias}</span>}
@@ -646,7 +655,8 @@ function GraphChatApp() {
                       disabled={isModelSwitching || generation !== null}
                     >
                       <div className="flex items-center justify-between gap-4">
-                        <div>
+                        <div className="flex items-center gap-3">
+                          <CpuIcon className="h-4 w-4 text-sky-300" />
                           <div className="font-medium">{displayModelName(model.name)}</div>
                         </div>
                         <span className={`rounded-full px-3 py-1 text-xs ${isActive ? 'bg-sky-400/15 text-sky-100' : 'bg-slate-800 text-slate-300'}`}>{isActive ? 'current' : 'switch'}</span>
@@ -704,11 +714,12 @@ function GraphChatApp() {
           proOptions={{ hideAttribution: true }}
           fitView
           onPaneContextMenu={openCanvasMenu}
-          onPaneClick={() => {
-            setCanvasMenu(null)
-            setNodeMenu(null)
-            setSelectedEdgeId(null)
-          }}
+            onPaneClick={() => {
+              setCanvasMenu(null)
+              setNodeMenu(null)
+              setSelectedNodeId(null)
+              setSelectedEdgeId(null)
+            }}
           onNodesChange={handleNodeChanges}
           onEdgesChange={handleEdgeChanges}
           onConnect={(connection) => void onConnect(connection)}
@@ -774,6 +785,7 @@ function GraphChatApp() {
           </div>
         )}
       </section>
+      </div>
     </div>
   )
 }
@@ -866,6 +878,35 @@ function NodeEditor({
 
 function ToolbarButton({ onClick, label }: { onClick: () => void; label: string }) {
   return <button className="rounded-full border border-slate-700 bg-slate-900/90 px-4 py-2 text-sm font-medium text-slate-100 shadow-sm hover:bg-slate-800" onClick={onClick}>{label}</button>
+}
+
+function ModelSelectorButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      className="flex max-w-[420px] items-center gap-3 rounded-md border border-slate-600 bg-slate-900/95 px-5 py-2.5 text-sm font-medium text-slate-100 shadow-lg transition hover:border-sky-400/50 hover:bg-slate-800"
+      onClick={onClick}
+    >
+      <CpuIcon className="h-4 w-4 shrink-0 text-sky-300" />
+      <span className="truncate">{label}</span>
+    </button>
+  )
+}
+
+function CpuIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M9 3v2" />
+      <path d="M15 3v2" />
+      <path d="M9 19v2" />
+      <path d="M15 19v2" />
+      <path d="M3 9h2" />
+      <path d="M3 14h2" />
+      <path d="M19 9h2" />
+      <path d="M19 14h2" />
+      <rect x="5" y="5" width="14" height="14" rx="3" />
+      <rect x="9" y="9" width="6" height="6" rx="1.5" />
+    </svg>
+  )
 }
 
 function MenuAction({ onClick, label }: { onClick: () => void; label: string }) {
