@@ -82,6 +82,8 @@ function GraphChatApp() {
   const [isModelLoaded, setIsModelLoaded] = useState(false)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
+  const [isMiniMapVisible, setIsMiniMapVisible] = useState(true)
+  const [generalSections, setGeneralSections] = useState({ context: true, interface: true })
   const [modelFilter, setModelFilter] = useState('')
   const [projectDialog, setProjectDialog] = useState<ProjectDialogState>(null)
   const [projectMenu, setProjectMenu] = useState<ProjectMenuState>(null)
@@ -435,6 +437,21 @@ function GraphChatApp() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setIsModelSwitching(false)
+    }
+  }
+
+  async function handleContextLengthChange(contextLength: number) {
+    if (!settings) return
+    const normalized = Math.max(4096, Math.min(65536, contextLength))
+    if (normalized === settings.contextLength) return
+    setError(null)
+    try {
+      const result = await window.graphChat.updateSettings({ contextLength: normalized })
+      setSettings(result.settings)
+      setIsModelLoaded(false)
+      setStatus(`Context length set to ${normalized}. Reload model to apply.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -801,7 +818,7 @@ function GraphChatApp() {
           }}
           defaultEdgeOptions={{ style: { strokeWidth: 2, stroke: '#3a3f50' } }}
         >
-          <MiniMap pannable zoomable style={{ backgroundColor: '#181b23' }} nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />
+          {isMiniMapVisible && <MiniMap pannable zoomable style={{ backgroundColor: '#181b23' }} nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
           <Background gap={20} size={1.4} color="#2d3342" />
           <Controls />
         </ReactFlow>
@@ -809,9 +826,9 @@ function GraphChatApp() {
 
       {isInspectorOpen && (
       <section className="flex w-[380px] flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)]">
-        <div className="border-b border-[var(--border)] px-5 py-4">
-          <h2 className="font-serif text-xl font-semibold">{selectedNode?.title || 'Node Editor'}</h2>
-          <p className="mt-1 text-sm text-[var(--text-dim)]">{selectedNode ? selectedNode.type : 'Select a node'}</p>
+        <div className="border-b border-[var(--border)] px-5 py-3">
+          <h2 className="font-serif text-[18px] font-semibold">{selectedNode?.title || 'Properties'}</h2>
+          <p className="mt-1 text-[12px] text-[var(--text-dim)]">{selectedNode ? selectedNode.type : 'General settings'}</p>
         </div>
         {selectedNode ? (
           <NodeEditor
@@ -827,7 +844,14 @@ function GraphChatApp() {
             onDelete={() => void removeSelected()}
           />
         ) : (
-          <div className="p-5 text-sm text-[var(--text-dim)]">Select a node to edit. Connections can be removed by clicking an edge and pressing Delete.</div>
+          <GeneralInspector
+            settings={settings}
+            isMiniMapVisible={isMiniMapVisible}
+            sections={generalSections}
+            onToggleSection={(section) => setGeneralSections((current) => ({ ...current, [section]: !current[section] }))}
+            onToggleMiniMap={() => setIsMiniMapVisible((current) => !current)}
+            onChangeContextLength={(value) => void handleContextLengthChange(value)}
+          />
         )}
         {reader && (
           <div className="border-t border-[var(--border)] bg-[rgba(28,31,43,0.84)] p-5">
@@ -937,6 +961,134 @@ function NodeEditor({
   )
 }
 
+function GeneralInspector({
+  settings,
+  isMiniMapVisible,
+  sections,
+  onToggleSection,
+  onToggleMiniMap,
+  onChangeContextLength
+}: {
+  settings: AppSettings | null
+  isMiniMapVisible: boolean
+  sections: { context: boolean; interface: boolean }
+  onToggleSection: (section: 'context' | 'interface') => void
+  onToggleMiniMap: () => void
+  onChangeContextLength: (value: number) => void
+}) {
+  const defaultContextLength = 32768
+  const [pendingContextLength, setPendingContextLength] = useState(settings?.contextLength ?? defaultContextLength)
+  const isContextLengthChanged = pendingContextLength !== defaultContextLength
+
+  useEffect(() => {
+    setPendingContextLength(settings?.contextLength ?? defaultContextLength)
+  }, [settings?.contextLength])
+
+  return (
+    <div className="inspector-scrollbar flex-1 overflow-y-auto px-4 py-2">
+      <InspectorSection
+        title="Context and Offload"
+        icon={<TokenIcon className="h-[15px] w-[15px]" />}
+        open={sections.context}
+        onToggle={() => onToggleSection('context')}
+      >
+        <label className="block">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <span className="text-[14px] text-[var(--text-dim)]">Context Length</span>
+            <div className="flex items-center gap-2">
+              {isContextLengthChanged && (
+                <button
+                  type="button"
+                  aria-label="Reset context length"
+                  title="Reset context length"
+                  onClick={() => {
+                    setPendingContextLength(defaultContextLength)
+                    onChangeContextLength(defaultContextLength)
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-[8px] text-[var(--text-faint)] transition hover:bg-white/5 hover:text-[var(--text-dim)]"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <input
+                type="number"
+                min={4096}
+                max={65536}
+                step={1024}
+                value={pendingContextLength}
+                onChange={(event) => setPendingContextLength(Number(event.target.value) || 4096)}
+                onBlur={() => onChangeContextLength(pendingContextLength)}
+                className="h-8 w-[102px] rounded-[10px] border border-[var(--border-strong)] bg-[rgba(28,31,43,0.88)] px-3 py-1.5 text-right text-[13px] text-[var(--text)] outline-none"
+              />
+            </div>
+          </div>
+          <input
+            type="range"
+            min={4096}
+            max={65536}
+            step={1024}
+            value={pendingContextLength}
+            onChange={(event) => setPendingContextLength(Number(event.target.value))}
+            onMouseUp={() => onChangeContextLength(pendingContextLength)}
+            onTouchEnd={() => onChangeContextLength(pendingContextLength)}
+            className="graph-slider w-full"
+          />
+          <p className="mt-2 text-[11px] leading-5 text-[var(--text-faint)]">Applied on the next model load.</p>
+        </label>
+      </InspectorSection>
+
+      <InspectorSection
+        title="Interface"
+        icon={<SidebarToggleIcon className="h-[15px] w-[15px]" />}
+        open={sections.interface}
+        onToggle={() => onToggleSection('interface')}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] text-[var(--text-dim)]">Show MiniMap</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isMiniMapVisible}
+            onClick={onToggleMiniMap}
+            className={`relative h-[28px] w-[48px] rounded-full transition ${isMiniMapVisible ? 'bg-[rgba(124,90,247,0.24)]' : 'bg-[rgba(28,31,43,0.88)]'}`}
+          >
+            <span
+              className={`absolute top-[4px] h-[20px] w-[20px] rounded-full bg-[var(--text)] transition ${isMiniMapVisible ? 'left-[24px]' : 'left-[4px]'}`}
+            />
+          </button>
+        </div>
+      </InspectorSection>
+    </div>
+  )
+}
+
+function InspectorSection({
+  title,
+  icon,
+  open,
+  onToggle,
+  children
+}: {
+  title: string
+  icon: ReactNode
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="mb-4">
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between px-0 py-1.5 text-left">
+        <span className="flex items-center gap-2 text-[13px] font-medium text-[var(--text)]">
+          <span className="text-[var(--text-dim)]">{icon}</span>
+          <span>{title}</span>
+        </span>
+        <ChevronDownIcon className={`h-3.5 w-3.5 text-[var(--text-dim)] transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="pt-2">{children}</div>}
+    </div>
+  )
+}
+
 function ToolbarButton({ onClick, label }: { onClick: () => void; label: string }) {
   return <button className="rounded-full border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm font-medium text-[var(--text)] shadow-sm hover:bg-white/5" onClick={onClick}>{label}</button>
 }
@@ -966,9 +1118,13 @@ function ModelSelectorButton({ onClick, label }: { onClick: () => void; label: s
       className="flex min-w-[220px] max-w-[480px] items-center gap-2 rounded-[8px] border border-[var(--border-strong)] bg-white/5 px-3.5 py-1.5 text-[13px] font-medium text-[var(--text-dim)] transition hover:border-[var(--accent)] hover:bg-white/10 hover:text-[var(--text)]"
       onClick={onClick}
     >
-      <CpuIcon className="h-[15px] w-[15px] shrink-0" />
-      <span className="truncate text-center">{label}</span>
-      <ChevronDownIcon className="h-3 w-3 shrink-0" />
+      <span className="flex w-4 shrink-0 justify-center">
+        <CpuIcon className="h-[15px] w-[15px]" />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-center">{label}</span>
+      <span className="flex w-4 shrink-0 justify-center">
+        <ChevronDownIcon className="h-3 w-3" />
+      </span>
     </button>
   )
 }
@@ -1069,6 +1225,18 @@ function FlagIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
       <path d="M6 20V5" />
       <path d="M6 5h9l-1.5 3L15 11H6" />
+    </svg>
+  )
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </svg>
   )
 }

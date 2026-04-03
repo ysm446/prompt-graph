@@ -60,8 +60,10 @@ export interface AppSettings {
   llamaModelAlias: string
   selectedModelPath: string
   selectedModelName: string
+  contextLength: number
   availableModels: ModelOption[]
   resolvedModelPath: string
   resolvedServerPath: string
 }
+
 

@@ -6,6 +6,7 @@ import { app } from 'electron'
 import type { AppSettings, ModelOption } from './types'
 
 const DEFAULT_PORT = 8080
+const DEFAULT_CONTEXT_LENGTH = 32768
 
 export class LlamaServerManager {
   private process: ChildProcessWithoutNullStreams | null = null
@@ -65,6 +66,22 @@ export class LlamaServerManager {
     return this.getSettings()
   }
 
+  async updateSettings(input: { contextLength?: number }): Promise<AppSettings> {
+    const nextContextLength = input.contextLength ?? this.settings.contextLength
+    const currentModel = this.listModels().find((model) => resolve(model.path) === resolve(this.settings.selectedModelPath))
+    if (!currentModel) {
+      throw new Error('Selected model was not found in models/.')
+    }
+
+    const changed = nextContextLength !== this.settings.contextLength
+    if (changed && this.process) {
+      await this.stop()
+    }
+
+    this.settings = this.buildSettings(currentModel, this.listModels(), nextContextLength)
+    return this.getSettings()
+  }
+
   async ensureRunning(): Promise<AppSettings> {
     if (await this.isHealthy()) {
       return this.getSettings()
@@ -84,13 +101,14 @@ export class LlamaServerManager {
     await delay(400)
   }
 
-  private buildSettings(selectedModel: ModelOption, availableModels = this.listModels()): AppSettings {
+  private buildSettings(selectedModel: ModelOption, availableModels = this.listModels(), contextLength = this.settings?.contextLength ?? DEFAULT_CONTEXT_LENGTH): AppSettings {
     accessSync(this.serverPath, constants.F_OK)
     return {
       llamaBaseUrl: `http://127.0.0.1:${DEFAULT_PORT}`,
       llamaModelAlias: toModelAlias(selectedModel.name),
       selectedModelPath: selectedModel.path,
       selectedModelName: selectedModel.name,
+      contextLength,
       availableModels,
       resolvedModelPath: selectedModel.path,
       resolvedServerPath: this.serverPath
@@ -111,7 +129,7 @@ export class LlamaServerManager {
         '--alias',
         llamaModelAlias,
         '--ctx-size',
-        '32768',
+        String(this.settings.contextLength),
         '--flash-attn',
         'on',
         '--reasoning',
@@ -176,4 +194,5 @@ function walkFiles(dir: string): string[] {
   }
   return files
 }
+
 

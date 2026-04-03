@@ -104,3 +104,40 @@ textarea {
 .inspector-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #40465b;
 }
+
+.graph-slider {
+  height: 18px;
+  appearance: none;
+  background: transparent;
+}
+
+.graph-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: #2b3040;
+}
+
+.graph-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -4.5px;
+  border: 0;
+  border-radius: 999px;
+  background: #a4abc4;
+}
+
+.graph-slider::-moz-range-track {
+  height: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: #2b3040;
+}
+
+.graph-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #a4abc4;
+}

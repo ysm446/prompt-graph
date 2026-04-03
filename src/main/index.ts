@@ -58,6 +58,10 @@ function registerIpc(): void {
     await llamaServer.stop()
     return { settings: llamaServer.getSettings() }
   })
+  ipcMain.handle('settings:update', async (_event, input: { contextLength?: number }) => {
+    const settings = await llamaServer.updateSettings(input)
+    return { settings }
+  })
   ipcMain.handle('project:create', async (_event, name: string) => {
     const project = repository.createProject(name)
     return { projects: repository.listProjects(), snapshot: repository.getProjectSnapshot(project.id) }
