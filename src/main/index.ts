@@ -389,12 +389,13 @@ Write the final content for this target node.`
 
 function stripThinkTags(content: string): string {
   return content
+    .replace(/^<\|channel\>thought\s*<channel\|>\s*/i, '')
+    .replace(/^<\|channel\>thought\r?\n<channel\|>\r?\n?/i, '')
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<\/?think>/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trimStart()
 }
-
 function getHandleParents(
   targetId: string,
   handle: TextInputHandle,

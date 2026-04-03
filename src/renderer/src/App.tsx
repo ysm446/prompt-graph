@@ -991,24 +991,24 @@ function GraphChatApp() {
         )}
         {isModelModalOpen && settings && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-6" onClick={() => !isModelSwitching && setIsModelModalOpen(false)}>
-            <div className="w-full max-w-2xl rounded-xl border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="relative w-full max-w-2xl rounded-xl border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-4">
                 <div />
-                <button className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm text-[var(--text)]" onClick={() => setIsModelModalOpen(false)} disabled={isModelSwitching}>Close</button>
+                <button className="rounded-[12px] border border-[var(--border-strong)] px-3 py-1 text-sm text-[var(--text)] disabled:opacity-40" onClick={() => setIsModelModalOpen(false)} disabled={isModelSwitching}>Close</button>
               </div>
-              <div className="mt-4 max-h-[420px] overflow-y-auto">
+              <div className={`mt-4 max-h-[420px] overflow-y-auto transition ${isModelSwitching ? 'pointer-events-none opacity-35 blur-[1px]' : ''}`}>
                 <div className="px-1 pb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Your Models</div>
                 {filteredModels.map((model) => {
-                  const isActive = model.path === settings.selectedModelPath
+                  const isActive = isModelLoaded && model.path === settings.selectedModelPath
                   return (
                     <button
                       key={model.path}
-                      className={`block w-full border-0 px-3 py-4 text-left text-[13px] transition ${isActive ? 'bg-white/5 text-[var(--text)]' : 'text-[var(--text-dim)] hover:bg-white/4 hover:text-[var(--text)]'}`}
+                      className={`block w-full rounded-[12px] border px-3 py-2.5 text-left text-[13px] transition disabled:cursor-wait disabled:opacity-70 ${isActive ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--text)]' : 'border-transparent text-[var(--text-dim)] hover:border-[var(--border-strong)] hover:bg-white/4 hover:text-[var(--text)]'}`}
                       onClick={() => void handleSelectModel(model)}
                       disabled={isModelSwitching || generation !== null}
                     >
                       <div className="flex items-center justify-between gap-6">
-                        <div className="min-w-0 truncate font-mono text-[15px] font-semibold leading-6">{displayModelName(model.name)}</div>
+                        <div className="min-w-0 truncate font-mono text-[14px] font-semibold leading-5">{displayModelName(model.name)}</div>
                         <div className="flex shrink-0 items-center gap-6 text-[12px] text-[var(--text-faint)]">
                           <span className="rounded-[8px] bg-white/6 px-3 py-1 font-semibold text-[var(--text-dim)]">{extractModelParams(model.name) ?? '--'}</span>
                           <span>{formatModelSize(model.sizeBytes)}</span>
@@ -1021,6 +1021,16 @@ function GraphChatApp() {
                   <p className="px-3 py-4 text-center text-[13px] text-[var(--text-faint)]">No models found</p>
                 )}
               </div>
+              {isModelSwitching && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="rounded-[14px] border border-[var(--border-strong)] bg-[rgba(17,19,24,0.94)] px-4 py-3 shadow-xl">
+                    <div className="inline-flex items-center gap-3 text-sm font-medium text-[var(--text)]">
+                      <SpinnerIcon className="h-4 w-4 animate-spin" />
+                      <span>モデルを読み込んでいます</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               {generation && <p className="mt-4 text-[13px] text-amber-300">You cannot switch models while generation is running.</p>}
             </div>
           </div>
@@ -1716,6 +1726,15 @@ function EjectIcon({ className }: { className?: string }) {
   )
 }
 
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+      <path d="M20 12a8 8 0 0 0-8-8" stroke="#7c5af7" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}
 function BoltIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
