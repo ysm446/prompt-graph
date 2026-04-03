@@ -606,12 +606,12 @@ function GraphChatApp() {
         <div className="relative flex h-full items-center justify-center">
           <div className="absolute left-0 top-1/2 -translate-y-1/2">
             <IconButton onClick={() => setIsSidebarOpen((current) => !current)} label={isSidebarOpen ? 'Hide sidebar' : 'Show sidebar'} active={isSidebarOpen}>
-              <SidebarToggleIcon className="h-4 w-4" />
+              <SidebarToggleIcon className="h-[18px] w-[18px]" />
             </IconButton>
           </div>
           <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-2">
             <IconButton onClick={() => setIsInspectorOpen((current) => !current)} label={isInspectorOpen ? 'Hide inspector' : 'Show inspector'} active={isInspectorOpen}>
-              <SidebarToggleIcon className="h-4 w-4 rotate-180" />
+              <SidebarToggleIcon className="h-[18px] w-[18px] rotate-180" />
             </IconButton>
             {generation && (
               <ToolbarButton onClick={() => void stopGeneration()} label="Stop" />
@@ -918,8 +918,8 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const node = data.graphNode
   const colors = {
     text: 'border-[var(--border-strong)] bg-[var(--bg-card)]',
-    context: 'border-[var(--accent-border)] bg-[rgba(124,90,247,0.08)]',
-    instruction: 'border-[rgba(217,70,239,0.32)] bg-[rgba(217,70,239,0.10)]'
+    context: 'border-[rgba(110,120,255,0.30)] bg-[rgba(110,120,255,0.10)]',
+    instruction: 'border-[rgba(186,85,232,0.30)] bg-[rgba(186,85,232,0.10)]'
   } as const
 
   return (
@@ -948,7 +948,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
             <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{node.type}</div>
             <div className="font-serif text-lg font-semibold">{node.title || 'Untitled'}</div>
           </button>
-          {node.type === 'text' && <button className="nodrag nopan rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--accent-hover)]" onClick={() => data.onGenerate(node.id)}>逕滓・ -&gt;</button>}
+          {node.type === 'text' && <button className="nodrag nopan rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--accent-hover)]" onClick={() => data.onGenerate(node.id)}>生成 -&gt;</button>}
         </div>
         <div className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-6 text-[var(--text)]">{node.content || 'No content yet.'}</div>
         <div className="mt-3 flex justify-between text-xs text-[var(--text-dim)]">
@@ -1092,10 +1092,10 @@ function GeneralInspector({
             role="switch"
             aria-checked={isMiniMapVisible}
             onClick={onToggleMiniMap}
-            className={`relative h-[28px] w-[48px] rounded-full transition ${isMiniMapVisible ? 'bg-[rgba(124,90,247,0.24)]' : 'bg-[rgba(28,31,43,0.88)]'}`}
+            className={`relative h-[24px] w-[42px] rounded-full transition ${isMiniMapVisible ? 'bg-[rgba(124,90,247,0.24)]' : 'bg-[rgba(28,31,43,0.88)]'}`}
           >
             <span
-              className={`absolute top-[4px] h-[20px] w-[20px] rounded-full bg-[var(--text)] transition ${isMiniMapVisible ? 'left-[24px]' : 'left-[4px]'}`}
+              className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-[var(--text)] transition ${isMiniMapVisible ? 'left-[21px]' : 'left-[3px]'}`}
             />
           </button>
         </div>
@@ -1193,7 +1193,6 @@ function SidebarToggleIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
       <rect x="3" y="5" width="18" height="14" rx="1.5" />
       <path d="M9 5v14" />
-      <path d="M6 9l-2 3 2 3" />
     </svg>
   )
 }
