@@ -926,10 +926,10 @@ function GraphChatApp() {
         {error && <div className="absolute right-4 top-4 z-20 max-w-md rounded-2xl border border-red-500/40 bg-red-950/70 px-4 py-3 text-sm text-red-200 shadow">{error}</div>}
         {!hasNodes && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-10">
-            <div className="max-w-xl rounded-[2rem] border border-[var(--border-strong)] bg-[rgba(17,19,24,0.9)] p-8 shadow-xl backdrop-blur-sm">
-              <div className="text-xs uppercase tracking-[0.3em] text-[var(--text-dim)]">Getting Started</div>
-              <h2 className="mt-2 font-serif text-3xl font-semibold">Build your graph from connected nodes.</h2>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-dim)]">Right-click the canvas to add nodes, then connect context, global instruction, local instruction, and text nodes to shape the output.</p>
+            <div className="max-w-xl rounded-[20px] border border-[var(--border-strong)] bg-[rgba(17,19,24,0.9)] p-8 shadow-xl backdrop-blur-sm">
+              <div className="text-xs uppercase tracking-[0.3em] text-[var(--text-dim)]">はじめに</div>
+              <h2 className="mt-2 text-3xl font-semibold leading-tight">ノードをつないで、条件と指示から出力を設計します。</h2>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-dim)]">キャンバスを右クリックしてノードを追加し、context、instruction、text を組み合わせながら、生成の流れを組み立ててください。</p>
             </div>
           </div>
         )}
@@ -1027,9 +1027,9 @@ function GraphChatApp() {
         )}
         {projectDialog && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-6" onClick={() => setProjectDialog(null)}>
-            <div className="w-full max-w-md rounded-[2rem] border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="text-xs uppercase tracking-[0.28em] text-[var(--text-dim)]">Project</div>
-              <h3 className="mt-2 font-serif text-2xl font-semibold">{projectDialog.mode === 'create' ? 'Create Project' : 'Rename Project'}</h3>
+            <div className="w-full max-w-md rounded-[20px] border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+              <div className="text-xs uppercase tracking-[0.28em] text-[var(--text-dim)]">プロジェクト</div>
+              <h3 className="mt-2 text-2xl font-semibold">{projectDialog.mode === 'create' ? '新しいプロジェクトを作成' : 'プロジェクト名を変更'}</h3>
               <input
                 autoFocus
                 value={projectDialog.value}
@@ -1043,12 +1043,12 @@ function GraphChatApp() {
                     }
                   }
                 }}
-                className="mt-4 w-full rounded-2xl border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 outline-none"
+                className="mt-4 w-full rounded-[14px] border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 outline-none"
               />
               <div className="mt-4 flex justify-end gap-2">
-                <button className="rounded-full border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--text)]" onClick={() => setProjectDialog(null)}>Cancel</button>
+                <button className="rounded-[12px] border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--text)]" onClick={() => setProjectDialog(null)}>キャンセル</button>
                 <button
-                  className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm text-white hover:bg-[var(--accent-hover)]"
+                  className="rounded-[12px] bg-[var(--accent)] px-4 py-2 text-sm text-white hover:bg-[var(--accent-hover)]"
                   onClick={() => {
                     if (projectDialog.mode === 'create') {
                       void submitCreateProject(projectDialog.value)
@@ -1057,7 +1057,7 @@ function GraphChatApp() {
                     }
                   }}
                 >
-                  Save
+                  保存
                 </button>
               </div>
             </div>
