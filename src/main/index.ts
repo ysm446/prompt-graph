@@ -15,6 +15,8 @@ const defaultUiPreferences: UiPreferences = {
   isSidebarOpen: true,
   isInspectorOpen: true,
   isMiniMapVisible: true,
+  leftSidebarWidth: 288,
+  rightInspectorWidth: 380,
   generalSections: {
     context: true,
     interface: true
@@ -355,10 +357,13 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     isSidebarOpen: input.isSidebarOpen ?? defaultUiPreferences.isSidebarOpen,
     isInspectorOpen: input.isInspectorOpen ?? defaultUiPreferences.isInspectorOpen,
     isMiniMapVisible: input.isMiniMapVisible ?? defaultUiPreferences.isMiniMapVisible,
+    leftSidebarWidth: input.leftSidebarWidth ?? defaultUiPreferences.leftSidebarWidth,
+    rightInspectorWidth: input.rightInspectorWidth ?? defaultUiPreferences.rightInspectorWidth,
     generalSections: {
       context: input.generalSections?.context ?? defaultUiPreferences.generalSections.context,
       interface: input.generalSections?.interface ?? defaultUiPreferences.generalSections.interface
     }
   }
 }
+
 

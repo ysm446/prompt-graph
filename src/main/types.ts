@@ -1,4 +1,4 @@
-﻿export type NodeType = 'text' | 'context' | 'instruction'
+export type NodeType = 'text' | 'context' | 'instruction'
 
 export interface ProjectRecord {
   id: string
@@ -71,8 +71,13 @@ export interface UiPreferences {
   isSidebarOpen: boolean
   isInspectorOpen: boolean
   isMiniMapVisible: boolean
+  leftSidebarWidth: number
+  rightInspectorWidth: number
   generalSections: {
     context: boolean
     interface: boolean
   }
 }
+
+
+

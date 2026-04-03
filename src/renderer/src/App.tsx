@@ -55,6 +55,15 @@ type ProjectMenuState = {
   projectId: string
 } | null
 
+type ResizeSide = 'left' | 'right'
+
+const DEFAULT_LEFT_SIDEBAR_WIDTH = 288
+const DEFAULT_RIGHT_INSPECTOR_WIDTH = 380
+const MIN_LEFT_SIDEBAR_WIDTH = 220
+const MAX_LEFT_SIDEBAR_WIDTH = 520
+const MIN_RIGHT_INSPECTOR_WIDTH = 300
+const MAX_RIGHT_INSPECTOR_WIDTH = 560
+
 function App() {
   return (
     <ReactFlowProvider>
@@ -83,6 +92,8 @@ function GraphChatApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [isMiniMapVisible, setIsMiniMapVisible] = useState(true)
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
+  const [rightInspectorWidth, setRightInspectorWidth] = useState(DEFAULT_RIGHT_INSPECTOR_WIDTH)
   const [generalSections, setGeneralSections] = useState({ context: true, interface: true })
   const [modelFilter, setModelFilter] = useState('')
   const [projectDialog, setProjectDialog] = useState<ProjectDialogState>(null)
@@ -92,6 +103,7 @@ function GraphChatApp() {
   const snapshotRef = useRef<ProjectSnapshot | null>(null)
   const copiedNodeIdRef = useRef<string | null>(null)
   const hasLoadedPreferencesRef = useRef(false)
+  const resizeStateRef = useRef<{ side: ResizeSide; startX: number; startWidth: number } | null>(null)
 
   useEffect(() => {
     void window.graphChat.bootstrap().then(({ projects, snapshot, settings, uiPreferences }) => {
@@ -100,6 +112,8 @@ function GraphChatApp() {
       setIsSidebarOpen(uiPreferences.isSidebarOpen)
       setIsInspectorOpen(uiPreferences.isInspectorOpen)
       setIsMiniMapVisible(uiPreferences.isMiniMapVisible)
+      setLeftSidebarWidth(uiPreferences.leftSidebarWidth)
+      setRightInspectorWidth(uiPreferences.rightInspectorWidth)
       setGeneralSections(uiPreferences.generalSections)
       setActiveProjectId(snapshot.project.id)
       applySnapshot(snapshot)
@@ -117,10 +131,12 @@ function GraphChatApp() {
       isSidebarOpen,
       isInspectorOpen,
       isMiniMapVisible,
+      leftSidebarWidth,
+      rightInspectorWidth,
       generalSections
     }
     void window.graphChat.savePreferences(payload)
-  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, generalSections])
+  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, leftSidebarWidth, rightInspectorWidth, generalSections])
 
   useEffect(() => {
     const offDelta = window.graphChat.onGenerationDelta(({ nodeId, content }) => {
@@ -152,6 +168,29 @@ function GraphChatApp() {
     }
     window.addEventListener('click', closeMenu)
     return () => window.removeEventListener('click', closeMenu)
+  }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (event: MouseEvent) => {
+      const resizeState = resizeStateRef.current
+      if (!resizeState) return
+      if (resizeState.side === 'left') {
+        setLeftSidebarWidth(clamp(resizeState.startWidth + (event.clientX - resizeState.startX), MIN_LEFT_SIDEBAR_WIDTH, MAX_LEFT_SIDEBAR_WIDTH))
+      } else {
+        setRightInspectorWidth(clamp(resizeState.startWidth - (event.clientX - resizeState.startX), MIN_RIGHT_INSPECTOR_WIDTH, MAX_RIGHT_INSPECTOR_WIDTH))
+      }
+    }
+    const handlePointerUp = () => {
+      resizeStateRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', handlePointerMove)
+    window.addEventListener('mouseup', handlePointerUp)
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseup', handlePointerUp)
+    }
   }, [])
 
   useEffect(() => {
@@ -597,6 +636,17 @@ function GraphChatApp() {
     })
   }
 
+  function beginSidebarResize(side: ResizeSide, event: React.MouseEvent<HTMLDivElement>) {
+    event.preventDefault()
+    resizeStateRef.current = {
+      side,
+      startX: event.clientX,
+      startWidth: side === 'left' ? leftSidebarWidth : rightInspectorWidth
+    }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
   const hasNodes = nodes.length > 0
   const nodeMenuNode = nodeMenu ? snapshotRef.current?.nodes.find((node) => node.id === nodeMenu.nodeId) ?? null : null
   const filteredModels = settings?.availableModels.filter((model) => model.name.toLowerCase().includes(modelFilter.toLowerCase())) ?? []
@@ -637,7 +687,8 @@ function GraphChatApp() {
       </header>
       <div className="flex min-h-0 flex-1">
       {isSidebarOpen && (
-      <aside className="flex w-72 flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)]">
+      <>
+      <aside style={{ width: leftSidebarWidth }} className="flex shrink-0 flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)]">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <div className="text-sm font-semibold tracking-[0.02em] text-[var(--text-dim)]">Projects</div>
           <IconButton onClick={() => void createProject()} label="Create project">
@@ -675,6 +726,8 @@ function GraphChatApp() {
           ))}
         </div>
       </aside>
+      <SidebarResizeHandle onMouseDown={(event) => beginSidebarResize('left', event)} />
+      </>
       )}
 
       <main ref={mainRef} className="relative flex-1">
@@ -867,7 +920,9 @@ function GraphChatApp() {
       </main>
 
       {isInspectorOpen && (
-      <section className="flex w-[380px] flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)]">
+      <>
+      <SidebarResizeHandle onMouseDown={(event) => beginSidebarResize('right', event)} />
+      <section style={{ width: rightInspectorWidth }} className="flex shrink-0 flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)]">
         <div className="border-b border-[var(--border)] px-5 py-3">
           <h2 className="font-serif text-[18px] font-semibold">{selectedNode?.title || 'Properties'}</h2>
           <p className="mt-1 text-[12px] text-[var(--text-dim)]">{selectedNode ? selectedNode.type : 'General settings'}</p>
@@ -907,8 +962,9 @@ function GraphChatApp() {
             </div>
             <textarea readOnly value={reader.content} className="h-56 w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg)] p-3 text-sm text-[var(--text)]" />
           </div>
-          )}
-        </section>
+        )}
+      </section>
+      </>
       )}
       </div>
     </div>
@@ -1140,6 +1196,14 @@ function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
   return <span className="inline-flex items-center gap-1.5">{icon}<span>{label}</span></span>
 }
 
+function SidebarResizeHandle({ onMouseDown }: { onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void }) {
+  return (
+    <div className="group relative z-20 w-px shrink-0 bg-[var(--border)] transition hover:bg-[var(--accent-border)]">
+      <div className="absolute inset-y-0 -left-[4px] -right-[4px] cursor-col-resize bg-transparent" onMouseDown={onMouseDown} />
+    </div>
+  )
+}
+
 function IconButton({ onClick, label, children, active = false, disabled = false }: { onClick: () => void; label: string; children: ReactNode; active?: boolean; disabled?: boolean }) {
   return (
     <button
@@ -1307,6 +1371,10 @@ function getMiniMapNodeColor(node: Node<AppNodeData>): string {
   if (type === 'context') return '#3a315f'
   if (type === 'instruction') return '#5b2d5d'
   return '#2a2745'
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
 }
 
 function isEditableElement(target: EventTarget | null): boolean {
