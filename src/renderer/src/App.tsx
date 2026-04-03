@@ -426,10 +426,37 @@ function GraphChatApp() {
     const graphNode = snapshotRef.current?.nodes.find((node) => node.id === nodeId)
     if (!graphNode) return
     selectNode(nodeId)
-    const updated = { ...graphNode, position: normalizePosition(input.position, isSnapToGridEnabled), size: input.size }
+    const normalizedBounds = normalizeNodeBounds(input, isSnapToGridEnabled)
+    const updated = { ...graphNode, position: normalizedBounds.position, size: normalizedBounds.size }
     mutateLocalNode(updated)
     await persistNode(updated)
     setStatus('Node resized')
+  }
+
+  function toggleSnapToGrid() {
+    setIsSnapToGridEnabled((current) => {
+      const next = !current
+      if (next) {
+        alignAllNodesToGrid()
+      }
+      return next
+    })
+  }
+
+  function alignAllNodesToGrid() {
+    const snapshot = snapshotRef.current
+    if (!snapshot) return
+    const normalizedNodes = snapshot.nodes.map((node) => {
+      const normalized = normalizeNodeBounds({ position: node.position, size: node.size }, true)
+      return {
+        ...node,
+        position: normalized.position,
+        size: normalized.size
+      }
+    })
+    applySnapshot({ ...snapshot, nodes: normalizedNodes })
+    setIsProjectDirty(true)
+    setStatus('Nodes aligned to grid')
   }
 
   async function onConnect(connection: Connection) {
@@ -1113,7 +1140,7 @@ function GraphChatApp() {
             sections={generalSections}
             onToggleSection={(section) => setGeneralSections((current) => ({ ...current, [section]: !current[section] }))}
             onToggleMiniMap={() => setIsMiniMapVisible((current) => !current)}
-            onToggleSnapToGrid={() => setIsSnapToGridEnabled((current) => !current)}
+            onToggleSnapToGrid={toggleSnapToGrid}
             onChangeContextLength={(value) => void handleContextLengthChange(value)}
             onChangeTemperature={(value) => void handleTemperatureChange(value)}
           />
@@ -1281,6 +1308,9 @@ function NodeEditor({
   onDelete: () => void
 }) {
   const totalTokens = node.generationMeta?.totalTokens ?? null
+  const estimatedContentTokens = node.type === 'context' || node.type === 'instruction'
+    ? estimateTokenCount(node.content)
+    : null
   const contextUsageRatio =
     totalTokens !== null && contextLength && contextLength > 0
       ? Math.min(totalTokens / contextLength, 1)
@@ -1299,6 +1329,11 @@ function NodeEditor({
       <label className="mb-4 block">
         <div className="mb-2 text-sm font-medium text-[var(--text-dim)]">Content</div>
         <textarea value={node.content} disabled={disabled} onChange={(event) => onChange({ ...node, content: event.target.value })} className="h-72 w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm outline-none" />
+        {estimatedContentTokens !== null && (
+          <div className="mt-2 text-xs text-[var(--text-faint)]">
+            Estimated tokens: {estimatedContentTokens}
+          </div>
+        )}
       </label>
       {(node.type === 'context' || node.type === 'instruction') && (
         <label className="mb-4 flex items-center justify-between rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm">
@@ -1775,9 +1810,49 @@ function snapPositionToGrid(position: { x: number; y: number }) {
   }
 }
 
+function snapSizeToGrid(size: { width: number; height: number }) {
+  return {
+    width: Math.max(GRID_SIZE, Math.round(size.width / GRID_SIZE) * GRID_SIZE),
+    height: Math.max(GRID_SIZE, Math.round(size.height / GRID_SIZE) * GRID_SIZE)
+  }
+}
+
+function normalizeNodeBounds(
+  bounds: { position: { x: number; y: number }; size: { width: number; height: number } },
+  shouldSnap: boolean
+) {
+  if (!shouldSnap) return bounds
+  return {
+    position: snapPositionToGrid(bounds.position),
+    size: snapSizeToGrid(bounds.size)
+  }
+}
+
 
 function normalizePosition(position: { x: number; y: number }, shouldSnap: boolean) {
   return shouldSnap ? snapPositionToGrid(position) : position
+}
+
+function estimateTokenCount(text: string): number {
+  const trimmed = text.trim()
+  if (!trimmed) return 0
+
+  const segments = trimmed.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]|[A-Za-z0-9]+(?:['_-][A-Za-z0-9]+)*|[^\s]/gu) ?? []
+  let total = 0
+
+  for (const segment of segments) {
+    if (/^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u.test(segment)) {
+      total += 1
+      continue
+    }
+    if (/^[A-Za-z0-9]+(?:['_-][A-Za-z0-9]+)*$/u.test(segment)) {
+      total += Math.max(1, Math.ceil(segment.length / 4))
+      continue
+    }
+    total += 1
+  }
+
+  return total
 }
 
 function isEditableElement(target: EventTarget | null): boolean {
