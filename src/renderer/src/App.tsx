@@ -393,6 +393,7 @@ function GraphChatApp() {
       title: defaultTitle(type),
       content: '',
       instruction: null,
+      isLocal: false,
       model: null,
       isGenerated: false,
       generationMeta: null,
@@ -445,7 +446,7 @@ function GraphChatApp() {
       }
       const expectedHandle = defaultTargetHandleForNodeType(sourceNode.type)
       if (expectedHandle !== targetHandle) {
-        throw new Error(`${displayNodeTypeLabel(sourceNode.type)} nodes connect to the ${targetHandleLabel(expectedHandle)} input.`)
+        throw new Error(`${displayNodeTypeLabel(sourceNode.type, sourceNode.isLocal)} nodes connect to the ${targetHandleLabel(expectedHandle)} input.`)
       }
       const nextEdge: GraphEdgeRecord = {
         id: crypto.randomUUID(),
@@ -798,7 +799,7 @@ function GraphChatApp() {
           <div className="flex max-w-full items-center gap-2">
             <ModelSelectorButton
               onClick={() => void openModelModal()}
-              label={settings ? (isModelLoaded ? displayModelName(settings.selectedModelName) : 'Load model') : 'Load model'}
+              label={settings ? (isModelLoaded ? displayModelName(settings.selectedModelName) : 'Select a model to load') : 'Select a model to load'}
             />
             {settings && isModelLoaded && (
               <IconButton
@@ -890,7 +891,6 @@ function GraphChatApp() {
             <MenuAction label="Add Text" onClick={() => void addNode('text', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Context" onClick={() => void addNode('context', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Global Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
-            <MenuAction label="Add Local Instruction" onClick={() => void addNode('local_instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
           </div>
         )}
         {nodeMenu && nodeMenuNode && (
@@ -940,25 +940,25 @@ function GraphChatApp() {
         )}
         {isModelModalOpen && settings && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/35 p-6" onClick={() => !isModelSwitching && setIsModelModalOpen(false)}>
-            <div className="w-full max-w-2xl rounded-[2rem] border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-2xl rounded-xl border border-[var(--border-strong)] bg-[var(--bg-sidebar)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-4">
                 <div />
                 <button className="rounded-full border border-[var(--border-strong)] px-3 py-1 text-sm text-[var(--text)]" onClick={() => setIsModelModalOpen(false)} disabled={isModelSwitching}>Close</button>
               </div>
               <div className="mt-4 max-h-[420px] overflow-y-auto">
-                <div className="px-1 pb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Your Models</div>
+                <div className="px-1 pb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-faint)]">Your Models</div>
                 {filteredModels.map((model) => {
                   const isActive = model.path === settings.selectedModelPath
                   return (
                     <button
                       key={model.path}
-                      className={`block w-full border-0 px-3 py-4 text-left transition ${isActive ? 'bg-white/5 text-[var(--text)]' : 'text-[var(--text-dim)] hover:bg-white/4 hover:text-[var(--text)]'}`}
+                      className={`block w-full border-0 px-3 py-4 text-left text-[13px] transition ${isActive ? 'bg-white/5 text-[var(--text)]' : 'text-[var(--text-dim)] hover:bg-white/4 hover:text-[var(--text)]'}`}
                       onClick={() => void handleSelectModel(model)}
                       disabled={isModelSwitching || generation !== null}
                     >
                       <div className="flex items-center justify-between gap-6">
-                        <div className="min-w-0 truncate font-mono text-[17px] font-semibold leading-7">{displayModelName(model.name)}</div>
-                        <div className="flex shrink-0 items-center gap-6 text-sm text-[var(--text-faint)]">
+                        <div className="min-w-0 truncate font-mono text-[15px] font-semibold leading-6">{displayModelName(model.name)}</div>
+                        <div className="flex shrink-0 items-center gap-6 text-[12px] text-[var(--text-faint)]">
                           <span className="rounded-[8px] bg-white/6 px-3 py-1 font-semibold text-[var(--text-dim)]">{extractModelParams(model.name) ?? '--'}</span>
                           <span>{formatModelSize(model.sizeBytes)}</span>
                         </div>
@@ -967,10 +967,10 @@ function GraphChatApp() {
                   )
                 })}
                 {filteredModels.length === 0 && (
-                  <p className="px-3 py-4 text-center text-sm text-[var(--text-faint)]">No models found</p>
+                  <p className="px-3 py-4 text-center text-[13px] text-[var(--text-faint)]">No models found</p>
                 )}
               </div>
-              {generation && <p className="mt-4 text-sm text-amber-300">You cannot switch models while generation is running.</p>}
+              {generation && <p className="mt-4 text-[13px] text-amber-300">You cannot switch models while generation is running.</p>}
             </div>
           </div>
         )}
@@ -1116,8 +1116,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const colors = {
     text: 'border-[var(--border-strong)] bg-[var(--bg-card)]',
     context: 'border-[rgb(90,100,210)] bg-[rgba(37,40,66,0.8)]',
-    instruction: 'border-[rgb(156,76,196)] bg-[rgba(58,37,74,0.8)]',
-    local_instruction: 'border-[rgb(214,108,186)] bg-[rgba(74,42,71,0.8)]'
+    instruction: 'border-[rgb(156,76,196)] bg-[rgba(58,37,74,0.8)]'
   } as const
 
   useEffect(() => {
@@ -1166,7 +1165,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
       <div className="flex h-full flex-col">
         <div className="mb-2 flex items-start justify-between gap-2">
           <button className="nodrag nopan text-left" onClick={() => data.onSelect(node.id)}>
-            <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{displayNodeTypeLabel(node.type)}</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{displayNodeTypeLabel(node.type, node.isLocal)}</div>
             <div className="font-serif text-lg font-semibold">{node.title || 'Untitled'}</div>
           </button>
           {node.type === 'text' && (
@@ -1258,6 +1257,18 @@ function NodeEditor({
         <div className="mb-2 text-sm font-medium text-[var(--text-dim)]">Content</div>
         <textarea value={node.content} disabled={disabled} onChange={(event) => onChange({ ...node, content: event.target.value })} className="h-72 w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm outline-none" />
       </label>
+      {(node.type === 'context' || node.type === 'instruction') && (
+        <label className="mb-4 flex items-center justify-between rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm">
+          <span className="text-[var(--text-dim)]">Local only</span>
+          <input
+            type="checkbox"
+            checked={node.isLocal}
+            disabled={disabled}
+            onChange={(event) => onChange({ ...node, isLocal: event.target.checked })}
+            className="h-4 w-4 accent-[var(--accent)]"
+          />
+        </label>
+      )}
       {node.generationMeta && (
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
           {node.generationMeta.tokensPerSecond !== null && <MetaItem icon={<BoltIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.tokensPerSecond.toFixed(1)} tok/sec`} />}
@@ -1568,25 +1579,18 @@ function MenuAction({ onClick, label }: { onClick: () => void; label: string }) 
 function defaultTitle(type: NodeType): string {
   switch (type) {
     case 'context':
-      return 'Context'
+      return 'Global Context'
     case 'instruction':
       return 'Global Instruction'
-    case 'local_instruction':
-      return 'Local Instruction'
     default:
       return 'Text'
   }
 }
 
-function displayNodeTypeLabel(type: NodeType): string {
-  switch (type) {
-    case 'instruction':
-      return 'global instruction'
-    case 'local_instruction':
-      return 'local instruction'
-    default:
-      return type
-  }
+function displayNodeTypeLabel(type: NodeType, isLocal = false): string {
+  if (type === 'instruction') return isLocal ? 'local instruction' : 'global instruction'
+  if (type === 'context') return isLocal ? 'local context' : 'global context'
+  return type
 }
 
 function displayModelName(modelName: string): string {
@@ -1594,10 +1598,11 @@ function displayModelName(modelName: string): string {
 }
 
 function getMiniMapNodeColor(node: Node<AppNodeData>): string {
-  const type = node.data?.graphNode.type
-  if (type === 'context') return '#3a315f'
-  if (type === 'instruction') return '#5b2d5d'
-  if (type === 'local_instruction') return '#6c3d63'
+  const graphNode = node.data?.graphNode
+  const type = graphNode?.type
+  if (type === 'context') return graphNode?.isLocal ? '#44507a' : '#3a315f'
+  if (type === 'instruction') return graphNode?.isLocal ? '#6c3d63' : '#5b2d5d'
+  return '#3f4150'
 }
 
 function clamp(value: number, min: number, max: number): number {

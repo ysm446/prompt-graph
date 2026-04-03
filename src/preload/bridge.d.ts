@@ -15,7 +15,7 @@ export interface GraphChatApi {
   saveProjectSnapshot(snapshot: ProjectSnapshot): Promise<{ projects: ProjectRecord[]; snapshot: ProjectSnapshot }>
   createNode(input: {
     projectId: string
-    type: 'text' | 'context' | 'instruction' | 'local_instruction'
+    type: 'text' | 'context' | 'instruction'
     title?: string
     content?: string
     instruction?: string | null

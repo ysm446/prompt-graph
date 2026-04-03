@@ -1,4 +1,4 @@
-export type NodeType = 'text' | 'context' | 'instruction' | 'local_instruction'
+export type NodeType = 'text' | 'context' | 'instruction'
 export type TextInputHandle = 'text' | 'context' | 'instruction'
 export type NodeOutputHandle = 'output'
 
@@ -23,6 +23,7 @@ export interface GraphNodeRecord {
   title: string
   content: string
   instruction: string | null
+  isLocal: boolean
   model: string | null
   isGenerated: boolean
   generationMeta: GenerationMeta | null

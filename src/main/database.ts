@@ -15,6 +15,7 @@ type NodeRow = {
   title: string
   content: string
   instruction: string | null
+  is_local: number
   model: string | null
   is_generated: number
   generation_meta: string | null
@@ -48,6 +49,7 @@ export interface CreateNodeInput {
   title?: string
   content?: string
   instruction?: string | null
+  isLocal?: boolean
   model?: string | null
   isGenerated?: boolean
   generationMeta?: GraphNodeRecord['generationMeta']
@@ -60,6 +62,7 @@ export interface UpdateNodeInput {
   title?: string
   content?: string
   instruction?: string | null
+  isLocal?: boolean
   position?: { x: number; y: number }
   size?: { width: number; height: number }
   model?: string | null
@@ -86,10 +89,11 @@ export class GraphRepository {
       CREATE TABLE IF NOT EXISTS nodes (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        type TEXT NOT NULL CHECK(type IN ('text', 'context', 'instruction', 'local_instruction')),
+        type TEXT NOT NULL CHECK(type IN ('text', 'context', 'local_context', 'instruction', 'local_instruction')),
         title TEXT NOT NULL DEFAULT '',
         content TEXT NOT NULL DEFAULT '',
         instruction TEXT,
+        is_local INTEGER NOT NULL DEFAULT 0,
         model TEXT,
         is_generated INTEGER NOT NULL DEFAULT 0,
         generation_meta TEXT,
@@ -166,8 +170,8 @@ export class GraphRepository {
       this.db.prepare('DELETE FROM nodes WHERE project_id = ?').run(snapshot.project.id)
 
       const insertNode = this.db.prepare(
-        `INSERT INTO nodes (id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO nodes (id, project_id, type, title, content, instruction, is_local, model, is_generated, generation_meta, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       const insertPosition = this.db.prepare('INSERT INTO node_positions (node_id, x, y, width, height) VALUES (?, ?, ?, ?, ?)')
       const insertEdge = this.db.prepare('INSERT INTO edges (id, project_id, source_id, target_id, source_handle, target_handle) VALUES (?, ?, ?, ?, ?, ?)')
@@ -180,6 +184,7 @@ export class GraphRepository {
           node.title,
           node.content,
           node.instruction,
+          node.isLocal ? 1 : 0,
           node.model,
           node.isGenerated ? 1 : 0,
           node.generationMeta ? JSON.stringify(node.generationMeta) : null,
@@ -205,8 +210,8 @@ export class GraphRepository {
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO nodes (id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO nodes (id, project_id, type, title, content, instruction, is_local, model, is_generated, generation_meta, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           id,
@@ -215,6 +220,7 @@ export class GraphRepository {
           input.title ?? '',
           input.content ?? '',
           input.instruction ?? null,
+          input.isLocal ? 1 : 0,
           input.model ?? null,
           input.isGenerated ? 1 : 0,
           input.generationMeta ? JSON.stringify(input.generationMeta) : null,
@@ -233,12 +239,13 @@ export class GraphRepository {
     this.db.transaction(() => {
       this.db
         .prepare(
-          `UPDATE nodes SET title = ?, content = ?, instruction = ?, model = ?, is_generated = ?, generation_meta = ?, updated_at = ? WHERE id = ?`
+          `UPDATE nodes SET title = ?, content = ?, instruction = ?, is_local = ?, model = ?, is_generated = ?, generation_meta = ?, updated_at = ? WHERE id = ?`
         )
         .run(
           input.title ?? current.title,
           input.content ?? current.content,
           input.instruction === undefined ? current.instruction : input.instruction,
+          input.isLocal === undefined ? Number(current.isLocal) : Number(input.isLocal),
           input.model ?? current.model,
           input.isGenerated === undefined ? Number(current.isGenerated) : Number(input.isGenerated),
           input.generationMeta === undefined ? (current.generationMeta ? JSON.stringify(current.generationMeta) : null) : (input.generationMeta ? JSON.stringify(input.generationMeta) : null),
@@ -300,7 +307,7 @@ export class GraphRepository {
   getNode(id: string): GraphNodeRecord {
     const row = this.db
       .prepare(
-        `SELECT n.id, n.project_id, n.type, n.title, n.content, n.instruction, n.model, n.is_generated, n.generation_meta, n.created_at, n.updated_at,
+        `SELECT n.id, n.project_id, n.type, n.title, n.content, n.instruction, n.is_local, n.model, n.is_generated, n.generation_meta, n.created_at, n.updated_at,
                 COALESCE(p.x, 80) AS x, COALESCE(p.y, 80) AS y,
                 COALESCE(p.width, ${DEFAULT_NODE_WIDTH}) AS width, COALESCE(p.height, ${DEFAULT_NODE_HEIGHT}) AS height
          FROM nodes n
@@ -317,7 +324,7 @@ export class GraphRepository {
   listNodes(projectId: string): GraphNodeRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT n.id, n.project_id, n.type, n.title, n.content, n.instruction, n.model, n.is_generated, n.generation_meta, n.created_at, n.updated_at,
+        `SELECT n.id, n.project_id, n.type, n.title, n.content, n.instruction, n.is_local, n.model, n.is_generated, n.generation_meta, n.created_at, n.updated_at,
                 COALESCE(p.x, 80) AS x, COALESCE(p.y, 80) AS y,
                 COALESCE(p.width, ${DEFAULT_NODE_WIDTH}) AS width, COALESCE(p.height, ${DEFAULT_NODE_HEIGHT}) AS height
          FROM nodes n
@@ -361,6 +368,9 @@ export class GraphRepository {
     if (!names.has('generation_meta')) {
       this.db.exec('ALTER TABLE nodes ADD COLUMN generation_meta TEXT;')
     }
+    if (!names.has('is_local')) {
+      this.db.exec('ALTER TABLE nodes ADD COLUMN is_local INTEGER NOT NULL DEFAULT 0;')
+    }
   }
   private ensureNodePositionColumns(): void {
     const columns = this.db.prepare('PRAGMA table_info(node_positions)').all() as Array<{ name: string }>
@@ -385,7 +395,7 @@ export class GraphRepository {
   }
   private ensureNodeTypeSupport(): void {
     const row = this.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'nodes'").get() as { sql: string } | undefined
-    if (row?.sql?.includes("'local_instruction'")) {
+    if (row?.sql?.includes("'local_instruction'") && row?.sql?.includes("'local_context'")) {
       return
     }
 
@@ -398,7 +408,7 @@ export class GraphRepository {
         CREATE TABLE nodes (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-          type TEXT NOT NULL CHECK(type IN ('text', 'context', 'instruction', 'local_instruction')),
+          type TEXT NOT NULL CHECK(type IN ('text', 'context', 'local_context', 'instruction', 'local_instruction')),
           title TEXT NOT NULL DEFAULT '',
           content TEXT NOT NULL DEFAULT '',
           instruction TEXT,
@@ -424,8 +434,8 @@ export class GraphRepository {
           width REAL NOT NULL,
           height REAL NOT NULL
         );
-        INSERT INTO nodes (id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at)
-        SELECT id, project_id, type, title, content, instruction, model, is_generated, generation_meta, created_at, updated_at FROM nodes_legacy;
+        INSERT INTO nodes (id, project_id, type, title, content, instruction, is_local, model, is_generated, generation_meta, created_at, updated_at)
+        SELECT id, project_id, type, title, content, instruction, is_local, model, is_generated, generation_meta, created_at, updated_at FROM nodes_legacy;
         INSERT INTO edges (id, project_id, source_id, target_id, source_handle, target_handle)
         SELECT id, project_id, source_id, target_id, source_handle, target_handle FROM edges_legacy;
         INSERT INTO node_positions (node_id, x, y, width, height)
@@ -447,10 +457,11 @@ function mapNode(row: NodeRow): GraphNodeRecord {
   return {
     id: row.id,
     projectId: row.project_id,
-    type: row.type,
+    type: row.type === 'local_context' ? 'context' : row.type === 'local_instruction' ? 'instruction' : row.type,
     title: row.title,
     content: row.content,
     instruction: row.instruction,
+    isLocal: row.is_local === 1 || row.type === 'local_context' || row.type === 'local_instruction',
     model: row.model,
     isGenerated: Boolean(row.is_generated),
     generationMeta: row.generation_meta ? JSON.parse(row.generation_meta) : null,

@@ -336,11 +336,11 @@ function collectContext(nodeId: string, nodes: GraphNodeRecord[], edges: GraphEd
   const upstreamTexts = collectUpstreamTextNodes(directTextParents, edges, nodeMap)
 
   const globalInstructionParts = directInstructionParents
-    .filter((node) => node.type === 'instruction')
+    .filter((node) => node.type === 'instruction' && !node.isLocal)
     .map((node) => node.content.trim())
     .filter(Boolean)
   const localInstructionParts = directInstructionParents
-    .filter((node) => node.type === 'local_instruction')
+    .filter((node) => node.type === 'instruction' && node.isLocal)
     .map((node) => node.content.trim())
     .filter(Boolean)
   const directParentTexts = directTextParents
@@ -353,7 +353,7 @@ ${node.content.trim()}`)
 ${node.content.trim()}`)
   const contextParts = directContextParents
     .filter((node) => node.content.trim())
-    .map((node, index) => `# Context ${index + 1}${node.title ? `: ${node.title}` : ''}
+    .map((node, index) => `# ${node.isLocal ? 'Local Context' : 'Context'} ${index + 1}${node.title ? `: ${node.title}` : ''}
 ${node.content.trim()}`)
   const targetInfo = self
     ? `# Target Node${self.title ? `: ${self.title}` : ''}
