@@ -1203,7 +1203,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   }
 
   return (
-    <div className={`relative h-full w-full rounded-3xl border-2 px-4 py-3 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
+    <div className={`relative h-full w-full rounded-3xl border-2 px-5 py-3.5 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
       <NodeResizeControl
         position="bottom-right"
         className={`${data.isSelected ? 'opacity-100' : 'opacity-0 pointer-events-none'} !h-3 !w-3 !rounded-[6px] !border !border-[var(--text-faint)] !bg-[var(--text)] shadow`}

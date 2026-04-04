@@ -101,9 +101,19 @@ export class LlamaServerManager {
   async stop(): Promise<void> {
     const proc = this.process
     this.process = null
-    if (!proc || proc.killed) return
+    if (!proc) return
+    if (proc.killed || proc.exitCode !== null) return
+
     proc.kill()
-    await delay(400)
+    const exited = await waitForProcessExit(proc, 5_000)
+    if (exited || !proc.pid) return
+
+    const killer = spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { windowsHide: true })
+    await new Promise<void>((resolve) => {
+      killer.once('exit', () => resolve())
+      killer.once('error', () => resolve())
+    })
+    await waitForProcessExit(proc, 2_000)
   }
 
   private buildSettings(selectedModel: ModelOption, availableModels = this.listModels(), contextLength = this.settings?.contextLength ?? DEFAULT_CONTEXT_LENGTH, temperature = this.settings?.temperature ?? DEFAULT_TEMPERATURE): AppSettings {
@@ -208,6 +218,21 @@ function canListen(port: number): Promise<boolean> {
       server.close(() => resolve(true))
     })
     server.listen(port, '127.0.0.1')
+  })
+}
+
+async function waitForProcessExit(proc: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+  if (proc.exitCode !== null) return true
+  return await new Promise<boolean>((resolve) => {
+    const onExit = () => {
+      clearTimeout(timer)
+      resolve(true)
+    }
+    const timer = setTimeout(() => {
+      proc.off('exit', onExit)
+      resolve(false)
+    }, timeoutMs)
+    proc.once('exit', onExit)
   })
 }
 
