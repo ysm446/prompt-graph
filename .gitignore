@@ -10,6 +10,7 @@ out/
 dist/
 build/
 release/
+__electron_probe/
 *.tsbuildinfo
 
 # Local runtime binaries and models

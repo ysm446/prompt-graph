@@ -19,7 +19,6 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeType, ProjectRecord, ProjectSnapshot, TextInputHandle, UiPreferences } from '../../main/types'
-import type { ReaderState } from './types'
 
 type AppNodeData = {
   graphNode: GraphNodeRecord
@@ -65,6 +64,12 @@ type CopiedSelection = {
 }
 
 type ResizeSide = 'left' | 'right'
+
+type ReaderState = {
+  nodeId: string
+  title: string
+  content: string
+}
 
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 288
 const DEFAULT_RIGHT_INSPECTOR_WIDTH = 380

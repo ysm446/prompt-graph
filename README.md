@@ -1,117 +1,115 @@
 # Prompt Graph
 
-Prompt Graph is a desktop app for building local LLM workflows as a directed acyclic graph.
-It uses Electron + React + React Flow for the UI, SQLite for project storage, and a local `llama.cpp` OpenAI-compatible server for generation.
+Prompt Graph は、ローカル LLM ワークフローをグラフとして構築するためのデスクトップアプリです。  
+UI には Electron + React + React Flow、プロジェクト保存には SQLite、生成実行にはローカルの `llama.cpp` OpenAI 互換サーバーを使っています。
 
-## Current Features
+## 現在の機能
 
-- Project list with manual save
-- Graph canvas with `text`, `context`, `global instruction`, and `local instruction` nodes
-- Resizable left and right sidebars
-- Upstream context collection for generation
-- Streaming generation through local `llama.cpp`
-- SQLite-backed project persistence
-- JSON-backed UI preference persistence
+- プロジェクト一覧と手動保存
+- `text` / `context` / `instruction` ノードによるグラフ編集
+- 左右サイドバーのリサイズ
+- 上流ノードをたどるコンテキスト収集
+- ローカル `llama.cpp` を使ったストリーミング生成
+- SQLite によるプロジェクト永続化
+- JSON による UI 設定の保存
 
-## Requirements
+## 動作要件
 
 - Windows
 - Node.js 24.x
 - npm 11.x
-- Local GGUF model files under `models/`
-- `llama.cpp` server files under `bin/llama-server/`
+- `models/` 配下に配置した GGUF モデル
+- `bin/llama-server/` 配下に配置した `llama.cpp` サーバーファイル
 
-## Local Model Setup
+## ローカルモデルの配置
 
-This project expects local runtime assets that are intentionally not committed:
+このプロジェクトでは、以下のランタイム資産はリポジトリに含めず、ローカルに配置する前提です。
 
 - `models/`
-  - example: `models/Qwen3.5-27B-GGUF/Qwen3.5-27B-Q6_K.gguf`
+  - 例: `models/Qwen3.5-27B-GGUF/Qwen3.5-27B-Q6_K.gguf`
 - `bin/llama-server/llama-b8648-bin-win-cuda-13.1-x64/`
-  - must contain `llama-server.exe` and related DLLs
+  - `llama-server.exe` と関連 DLL を含めてください
 
-The app scans `models/` for GGUF files and lets you choose them from the header model selector.
+アプリ起動後、`models/` 配下の GGUF ファイルを自動スキャンし、ヘッダーのモデルセレクターから選択できます。
 
-## Install
+## インストール
 
 ```powershell
 npm install
 npm run rebuild:electron
 ```
 
-## Start
+## 起動
 
-Recommended:
+推奨:
 
 ```powershell
 .\start.bat
 ```
 
-Manual development start:
+手動で開発起動する場合:
 
 ```powershell
 npm run rebuild:electron
 npm run dev
 ```
 
-Production build:
+本番ビルド:
 
 ```powershell
 npm run build
 ```
 
-## Usage
+## 使い方
 
-1. Launch the app.
-2. Create nodes from the canvas context menu.
-3. Connect upstream nodes into a target `text` node.
-4. Select the target `text` node and press `生成`.
-5. Press `Save` in the left sidebar when you want to persist the current project snapshot.
+1. アプリを起動します。
+2. キャンバスのコンテキストメニューからノードを追加します。
+3. 上流ノードを、対象となる `text` ノードへ接続します。
+4. 対象の `text` ノードを選択して `Generate` を実行します。
+5. 現在の状態を保存したいときは、左サイドバーの `Save` を押します。
 
-## Node Types
+## ノード種類
 
-- `text`: draft or generated prose
-- `context`: reference material and background facts
-- `global instruction`: shared instructions that continue to affect downstream nodes
-- `local instruction`: instructions that apply only to the directly connected target node
+- `text`: 下書きや生成結果の本文
+- `context`: 参考情報や背景情報
+- `instruction`: 生成時の指示文
 
-## Generation Behavior
+## 生成の挙動
 
-- Generation always targets a `text` node.
-- Upstream `text` nodes are treated as text history/source material.
-- Upstream `context` nodes are treated as reference context.
-- `global instruction` nodes are included as shared system instructions.
-- `local instruction` nodes affect only the directly connected target node.
-- Unsaved edits on the current graph are used for generation even before pressing `Save`.
+- 生成対象は常に `text` ノードです。
+- 上流の `text` ノードは、本文履歴や素材として扱われます。
+- 上流の `context` ノードは、参照コンテキストとして扱われます。
+- 上流の `instruction` ノードは、システム指示として扱われます。
+- 未保存の編集内容も、`Save` 前であっても生成に反映されます。
 
-## Saving
+## 保存
 
-- Project graph edits are kept locally until you press `Save`.
-- A dirty indicator appears when the current project has unsaved changes.
-- Switching projects or closing the app warns before discarding unsaved work.
-- UI preferences such as sidebar state, minimap visibility, and context length are stored separately in a JSON preferences file under Electron `userData`.
+- グラフ編集内容は、`Save` を押すまでローカルの作業状態として保持されます。
+- 未保存の変更がある場合は、ダーティーインジケーターが表示されます。
+- 未保存のままプロジェクト切り替えやアプリ終了を行うと、警告が表示されます。
+- サイドバー状態、ミニマップ表示、コンテキスト長などの UI 設定は、Electron の `userData` 配下の JSON ファイルに保存されます。
 
-## Keyboard Shortcuts
+## キーボードショートカット
 
-- `Delete`: delete selected node or edge
-- `Ctrl + C` / `Cmd + C`: copy selected node
-- `Ctrl + V` / `Cmd + V`: paste copied node near the current viewport center
+- `Delete`: 選択中のノードまたはエッジを削除
+- `Ctrl + C` / `Cmd + C`: 選択中ノードをコピー
+- `Ctrl + V` / `Cmd + V`: 現在のビューポート中央付近にノードを貼り付け
 
-Pasted `text` nodes start with empty content so they can be reused as a new generation target.
+貼り付けられた `text` ノードは、再利用しやすいように内容を空にした状態で作成されます。
 
-## Important Files
+## 重要なファイル
 
-- `GRAPH_CHAT_SPEC.md`: feature spec
-- `src/main/index.ts`: Electron main process and IPC
-- `src/main/database.ts`: SQLite repository
-- `src/main/llamaServer.ts`: local `llama.cpp` server management
-- `src/preload/index.ts`: renderer bridge
-- `src/renderer/src/App.tsx`: main UI
-- `src/renderer/src/index.css`: shared renderer styling
-- `start.bat`: Windows startup helper
+- `docs/GRAPH_CHAT_SPEC.md`: 機能仕様メモ
+- `src/main/index.ts`: Electron メインプロセスと IPC
+- `src/main/database.ts`: SQLite リポジトリ
+- `src/main/llamaServer.ts`: ローカル `llama.cpp` サーバー管理
+- `src/preload/index.ts`: renderer ブリッジ
+- `src/renderer/src/App.tsx`: メイン UI
+- `src/renderer/src/index.css`: renderer 共通スタイル
+- `start.bat`: Windows 用起動ヘルパー
 
-## Notes
+## 補足
 
-- `node_modules/`, `out/`, `bin/`, and `models/` are local-only and should not be committed.
-- The SQLite database is stored under Electron `userData`, not in the repository.
-- `better-sqlite3` must be rebuilt for the Electron runtime, so `npm run rebuild:electron` is included.
+- `node_modules/`, `out/`, `bin/`, `models/` はローカル専用で、コミットしない想定です。
+- SQLite データベースはリポジトリ内ではなく、Electron の `userData` 配下に保存されます。
+- `better-sqlite3` は Electron ランタイム向けの再ビルドが必要なため、`npm run rebuild:electron` を含めています。
