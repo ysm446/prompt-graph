@@ -1999,9 +1999,9 @@ function MenuAction({ onClick, label }: { onClick: () => void; label: string }) 
 function defaultTitle(type: NodeType): string {
   switch (type) {
     case 'context':
-      return 'Global Context'
+      return 'Context'
     case 'instruction':
-      return 'Global Instruction'
+      return 'Instruction'
     default:
       return 'Text'
   }
