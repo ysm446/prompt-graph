@@ -349,10 +349,30 @@ function collectContext(nodeId: string, nodes: GraphNodeRecord[], edges: GraphEd
   const directInstructionParents = getHandleParents(nodeId, 'instruction', edges, nodeMap)
   const upstreamTexts = collectUpstreamTextNodes(directTextParents, edges, nodeMap)
 
-  const globalInstructionParts = directInstructionParents
-    .filter((node) => node.type === 'instruction' && !node.isLocal)
-    .map((node) => node.content.trim())
-    .filter(Boolean)
+  // Collect global instructions/contexts from upstream text nodes
+  const seenInstructionIds = new Set(directInstructionParents.map((n) => n.id))
+  const seenContextIds = new Set(directContextParents.map((n) => n.id))
+  const upstreamGlobalInstructions: GraphNodeRecord[] = []
+  const upstreamGlobalContexts: GraphNodeRecord[] = []
+  for (const textNode of [...directTextParents, ...upstreamTexts]) {
+    for (const node of getHandleParents(textNode.id, 'instruction', edges, nodeMap)) {
+      if (!node.isLocal && !seenInstructionIds.has(node.id)) {
+        seenInstructionIds.add(node.id)
+        upstreamGlobalInstructions.push(node)
+      }
+    }
+    for (const node of getHandleParents(textNode.id, 'context', edges, nodeMap)) {
+      if (!node.isLocal && !seenContextIds.has(node.id)) {
+        seenContextIds.add(node.id)
+        upstreamGlobalContexts.push(node)
+      }
+    }
+  }
+
+  const globalInstructionParts = [
+    ...directInstructionParents.filter((node) => node.type === 'instruction' && !node.isLocal),
+    ...upstreamGlobalInstructions
+  ].map((node) => node.content.trim()).filter(Boolean)
   const localInstructionParts = directInstructionParents
     .filter((node) => node.type === 'instruction' && node.isLocal)
     .map((node) => node.content.trim())
@@ -365,8 +385,10 @@ ${node.content.trim()}`)
     .filter((node) => node.content.trim())
     .map((node, index) => `# Upstream Text ${index + 1}${node.title ? `: ${node.title}` : ''}
 ${node.content.trim()}`)
-  const contextParts = directContextParents
-    .filter((node) => node.content.trim())
+  const contextParts = [
+    ...directContextParents,
+    ...upstreamGlobalContexts
+  ].filter((node) => node.content.trim())
     .map((node, index) => `# ${node.isLocal ? 'Local Context' : 'Context'} ${index + 1}${node.title ? `: ${node.title}` : ''}
 ${node.content.trim()}`)
   const targetInfo = self
