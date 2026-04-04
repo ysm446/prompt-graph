@@ -1307,7 +1307,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   }
 
   return (
-    <div className={`relative h-full w-full rounded-3xl border-2 px-5 py-3.5 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
+    <div className={`relative h-full w-full rounded-3xl border-2 px-7 py-5 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
       <NodeResizeControl
         position="bottom-right"
         className={`${data.isSelected ? 'opacity-100' : 'opacity-0 pointer-events-none'} !h-3 !w-3 !rounded-[6px] !border !border-[var(--text-faint)] !bg-[var(--text)] shadow`}
@@ -1337,10 +1337,10 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
       <Handle id="output" type="source" position={Position.Right} className="!h-5 !w-5 !border-2 !border-[var(--text-faint)] !bg-[var(--text)]" />
       <div className="flex h-full flex-col">
         <div className="mb-2 flex items-start gap-2">
-          <button className="nodrag nopan flex-1 text-left" onClick={() => data.onSelect(node.id)}>
+          <div className="flex-1">
             <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{displayNodeTypeLabel(node.type, node.isLocal)}</div>
             <div className="font-serif text-lg font-semibold">{node.title || 'Untitled'}</div>
-          </button>
+          </div>
           <button
             className={`nodrag nopan ml-auto rounded-[10px] border px-3 py-1.5 text-sm font-medium transition ${
               data.isEditing
@@ -1398,10 +1398,12 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
             }}
             onMouseDown={(event) => event.stopPropagation()}
             placeholder="No content yet."
-            className="node-scrollbar nodrag nopan flex-1 resize-none overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[rgba(0,0,0,0.14)] px-3 py-2 text-sm leading-6 text-[var(--text)] outline-none"
+            className="node-scrollbar nodrag nopan nowheel flex-1 resize-none overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[rgba(0,0,0,0.14)] px-3 py-2 text-sm leading-6 text-[var(--text)] outline-none"
           />
         ) : (
-          <div className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-6 text-[var(--text)]">{node.content || 'No content yet.'}</div>
+          <div
+            className={`node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-6 text-[var(--text)]${data.isSelected ? ' nowheel' : ''}`}
+          >{node.content || 'No content yet.'}</div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
           {node.generationMeta?.completionTokens != null && <MetaItem icon={<MessageIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.completionTokens} tokens`} />}
