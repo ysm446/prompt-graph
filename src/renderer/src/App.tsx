@@ -1238,6 +1238,7 @@ function GraphChatApp() {
             disabled={generation?.nodeId === selectedNode.id}
             currentModelName={settings?.selectedModelName ?? null}
             contextLength={settings?.contextLength ?? null}
+            onOpenReader={() => openReader(selectedNode.id)}
             onChange={(updated) => {
               mutateLocalNode(updated)
               void persistNode(updated)
@@ -1335,10 +1336,31 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
       )}
       <Handle id="output" type="source" position={Position.Right} className="!h-5 !w-5 !border-2 !border-[var(--text-faint)] !bg-[var(--text)]" />
       <div className="flex h-full flex-col">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <button className="nodrag nopan text-left" onClick={() => data.onSelect(node.id)}>
+        <div className="mb-2 flex items-start gap-2">
+          <button className="nodrag nopan flex-1 text-left" onClick={() => data.onSelect(node.id)}>
             <div className="text-xs uppercase tracking-[0.24em] text-[var(--text-dim)]">{displayNodeTypeLabel(node.type, node.isLocal)}</div>
             <div className="font-serif text-lg font-semibold">{node.title || 'Untitled'}</div>
+          </button>
+          <button
+            className={`nodrag nopan ml-auto rounded-[10px] border px-3 py-1.5 text-sm font-medium transition ${
+              data.isEditing
+                ? 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--text)]'
+                : 'border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]'
+            }`}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+            onClick={() => {
+              if (data.isEditing) {
+                commitDraftContent()
+                data.onStopEdit()
+              } else {
+                data.onStartEdit(node.id)
+              }
+            }}
+          >
+            {data.isEditing ? 'Done' : 'Edit'}
           </button>
           {node.type === 'text' && (
             <button
@@ -1357,7 +1379,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
                 data.onGenerate(node.id)
               }}
             >
-              生成
+                Generate
             </button>
           )}
         </div>
@@ -1381,7 +1403,19 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
         ) : (
           <div className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-6 text-[var(--text)]">{node.content || 'No content yet.'}</div>
         )}
-        <div className="mt-3 flex justify-between text-xs text-[var(--text-dim)]">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
+          {node.generationMeta?.completionTokens != null && <MetaItem icon={<MessageIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.completionTokens} tokens`} />}
+          {node.generationMeta?.tokensPerSecond != null && <MetaItem icon={<BoltIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.tokensPerSecond.toFixed(1)} tok/s`} />}
+          {node.generationMeta?.durationSeconds != null && <MetaItem icon={<ClockIcon className="h-3.5 w-3.5" />} label={`${node.generationMeta.durationSeconds.toFixed(2)}s`} />}
+          {node.generationMeta?.finishReason && <MetaItem icon={<FlagIcon className="h-3.5 w-3.5" />} label={node.generationMeta.finishReason} />}
+          {(node.type === 'context' || node.type === 'instruction') && (
+            <MetaItem icon={<MessageIcon className="h-3.5 w-3.5" />} label={`~${estimateTokenCount(node.content)} tokens`} />
+          )}
+          <div className="ml-auto">
+            <MetaItem icon={<SidebarToggleIcon className="h-3.5 w-3.5" />} label={`${Math.round(node.size.width)} x ${Math.round(node.size.height)}`} />
+          </div>
+        </div>
+        <div className="hidden mt-3 justify-between text-xs text-[var(--text-dim)]">
           <div className="flex items-center gap-3">
             <button className="nodrag nopan" onClick={() => data.onOpenReader(node.id)}>Reader</button>
             <button className="nodrag nopan" onClick={() => {
@@ -1407,6 +1441,7 @@ function NodeEditor({
   disabled,
   currentModelName,
   contextLength,
+  onOpenReader,
   onChange,
   onDuplicate,
   onClear,
@@ -1416,6 +1451,7 @@ function NodeEditor({
   disabled: boolean
   currentModelName: string | null
   contextLength: number | null
+  onOpenReader: () => void
   onChange: (node: GraphNodeRecord) => void
   onDuplicate: () => void
   onClear: () => void
@@ -1436,6 +1472,10 @@ function NodeEditor({
 
   return (
     <div className="inspector-scrollbar flex-1 overflow-y-auto p-5">
+      <div className="mb-4 flex flex-wrap gap-2">
+        <ToolbarButton onClick={onOpenReader} label="Open Reader" />
+        <ToolbarButton onClick={onClear} label="Clear" />
+      </div>
       <label className="mb-4 block">
         <div className="mb-2 text-sm font-medium text-[var(--text-dim)]">Title</div>
         <input value={node.title} disabled={disabled} onChange={(event) => onChange({ ...node, title: event.target.value })} className="w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm outline-none" />
@@ -1687,7 +1727,7 @@ function InspectorSection({
 }
 
 function ToolbarButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return <button className="rounded-full border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm font-medium text-[var(--text)] shadow-sm hover:bg-white/5" onClick={onClick}>{label}</button>
+  return <button className="rounded-md border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm font-medium text-[var(--text)] shadow-sm hover:bg-white/5" onClick={onClick}>{label}</button>
 }
 
 function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
