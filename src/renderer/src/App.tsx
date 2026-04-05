@@ -12,6 +12,9 @@ import {
   useNodesState,
   useReactFlow,
   useViewport,
+  getSmoothStepPath,
+  BaseEdge,
+  type EdgeProps,
   type Connection,
   type Edge,
   type Node,
@@ -111,6 +114,7 @@ function GraphChatApp() {
   const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const [isMiniMapVisible, setIsMiniMapVisible] = useState(true)
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true)
+  const [edgeType, setEdgeType] = useState<'default' | 'smoothstep' | 'step'>('default')
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
   const [rightInspectorWidth, setRightInspectorWidth] = useState(DEFAULT_RIGHT_INSPECTOR_WIDTH)
   const [generalSections, setGeneralSections] = useState({ context: true, interface: true })
@@ -139,6 +143,7 @@ function GraphChatApp() {
       setIsInspectorOpen(uiPreferences.isInspectorOpen)
       setIsMiniMapVisible(uiPreferences.isMiniMapVisible)
       setIsSnapToGridEnabled(uiPreferences.isSnapToGridEnabled)
+      setEdgeType(uiPreferences.edgeType)
       setLeftSidebarWidth(uiPreferences.leftSidebarWidth)
       setRightInspectorWidth(uiPreferences.rightInspectorWidth)
       setGeneralSections(uiPreferences.generalSections)
@@ -160,12 +165,17 @@ function GraphChatApp() {
       isInspectorOpen,
       isMiniMapVisible,
       isSnapToGridEnabled,
+      edgeType,
       leftSidebarWidth,
       rightInspectorWidth,
       generalSections
     }
     void window.graphChat.savePreferences(payload)
-  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, isSnapToGridEnabled, leftSidebarWidth, rightInspectorWidth, generalSections])
+  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, leftSidebarWidth, rightInspectorWidth, generalSections])
+
+  useEffect(() => {
+    setEdges((current) => current.map((edge) => ({ ...edge, type: edgeType })))
+  }, [edgeType])
 
   useEffect(() => {
     const offDelta = window.graphChat.onGenerationDelta(({ nodeId, content }) => {
@@ -1208,6 +1218,7 @@ function GraphChatApp() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           proOptions={{ hideAttribution: true }}
           style={{ backgroundColor: 'var(--bg-canvas)' }}
           fitView
@@ -1244,7 +1255,7 @@ function GraphChatApp() {
           onEdgeDoubleClick={(_, edge) => {
             void removeEdge(edge.id)
           }}
-          defaultEdgeOptions={{ style: edgeStyleForHandle('text'), interactionWidth: 28 }}
+          defaultEdgeOptions={{ style: edgeStyleForHandle('text'), interactionWidth: 28, type: edgeType }}
         >
           {isMiniMapVisible && <MiniMap pannable zoomable nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
           <Background gap={GRID_SIZE} size={1.4} color="#394154" />
@@ -1280,10 +1291,12 @@ function GraphChatApp() {
             settings={settings}
             isMiniMapVisible={isMiniMapVisible}
             isSnapToGridEnabled={isSnapToGridEnabled}
+            edgeType={edgeType}
             sections={generalSections}
             onToggleSection={(section) => setGeneralSections((current) => ({ ...current, [section]: !current[section] }))}
             onToggleMiniMap={() => setIsMiniMapVisible((current) => !current)}
             onToggleSnapToGrid={toggleSnapToGrid}
+            onChangeEdgeType={setEdgeType}
             onChangeContextLength={(value) => void handleContextLengthChange(value)}
             onChangeTemperature={(value) => void handleTemperatureChange(value)}
           />
@@ -1601,20 +1614,24 @@ function GeneralInspector({
   settings,
   isMiniMapVisible,
   isSnapToGridEnabled,
+  edgeType,
   sections,
   onToggleSection,
   onToggleMiniMap,
   onToggleSnapToGrid,
+  onChangeEdgeType,
   onChangeContextLength,
   onChangeTemperature
 }: {
   settings: AppSettings | null
   isMiniMapVisible: boolean
   isSnapToGridEnabled: boolean
+  edgeType: 'default' | 'smoothstep' | 'step'
   sections: { context: boolean; interface: boolean }
   onToggleSection: (section: 'context' | 'interface') => void
   onToggleMiniMap: () => void
   onToggleSnapToGrid: () => void
+  onChangeEdgeType: (value: 'default' | 'smoothstep' | 'step') => void
   onChangeContextLength: (value: number) => void
   onChangeTemperature: (value: number) => void
 }) {
@@ -1761,6 +1778,18 @@ function GeneralInspector({
               className={`absolute top-[2px] h-[12px] w-[12px] rounded-full transition ${isSnapToGridEnabled ? 'left-[14px] bg-white' : 'left-[2px] bg-[rgba(255,255,255,0.35)]'}`}
             />
           </button>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-[13px] text-[var(--text-dim)]">Edge Style</span>
+          <select
+            value={edgeType}
+            onChange={(event) => onChangeEdgeType(event.target.value as 'default' | 'smoothstep' | 'step')}
+            className="rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-input)] px-2 py-0.5 text-[12px] text-[var(--text)] outline-none"
+          >
+            <option value="default">Bezier</option>
+            <option value="smoothstep">Smooth Step</option>
+            <option value="step">Step</option>
+          </select>
         </div>
       </InspectorSection>
     </div>
@@ -2206,6 +2235,13 @@ function targetHandleLabel(handle: TextInputHandle): string {
   if (handle === 'context') return 'Context'
   return 'Instruction'
 }
+function RoundedSmoothStepEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, markerStart }: EdgeProps) {
+  const [path] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 40})
+  return <BaseEdge path={path} style={style} markerEnd={markerEnd} markerStart={markerStart} />
+}
+
+const edgeTypes = { smoothstep: RoundedSmoothStepEdge }
+
 function edgeStyleForHandle(handle: TextInputHandle | null) {
   if (handle === 'context') {
     return { strokeWidth: 2.6, stroke: '#6170d8', opacity: 0.84 }

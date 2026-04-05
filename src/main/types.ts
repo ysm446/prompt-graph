@@ -81,6 +81,7 @@ export interface UiPreferences {
   isInspectorOpen: boolean
   isMiniMapVisible: boolean
   isSnapToGridEnabled: boolean
+  edgeType: 'default' | 'smoothstep' | 'step'
   leftSidebarWidth: number
   rightInspectorWidth: number
   generalSections: {

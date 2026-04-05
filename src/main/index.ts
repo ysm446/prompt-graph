@@ -17,6 +17,7 @@ const defaultUiPreferences: UiPreferences = {
   isInspectorOpen: true,
   isMiniMapVisible: true,
   isSnapToGridEnabled: true,
+  edgeType: 'default',
   leftSidebarWidth: 288,
   rightInspectorWidth: 380,
   generalSections: {
@@ -505,6 +506,7 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     isInspectorOpen: input.isInspectorOpen ?? defaultUiPreferences.isInspectorOpen,
     isMiniMapVisible: input.isMiniMapVisible ?? defaultUiPreferences.isMiniMapVisible,
     isSnapToGridEnabled: input.isSnapToGridEnabled ?? defaultUiPreferences.isSnapToGridEnabled,
+    edgeType: input.edgeType ?? defaultUiPreferences.edgeType,
     leftSidebarWidth: input.leftSidebarWidth ?? defaultUiPreferences.leftSidebarWidth,
     rightInspectorWidth: input.rightInspectorWidth ?? defaultUiPreferences.rightInspectorWidth,
     generalSections: {
