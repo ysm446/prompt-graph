@@ -996,11 +996,11 @@ function GraphChatApp() {
             {isProjectDirty && <span className="text-xs text-[var(--accent)]">●</span>}
           </div>
           <div className="flex items-center gap-1">
-            <IconButton onClick={() => void saveProject()} label="Save project" disabled={!isProjectDirty}>
-              <SaveIcon className="h-4 w-4" />
-            </IconButton>
             <IconButton onClick={() => void createProject()} label="Create project">
               <NewFolderIcon className="h-4 w-4" />
+            </IconButton>
+            <IconButton onClick={() => void saveProject()} label="Save project" disabled={!isProjectDirty}>
+              <SaveIcon className="h-4 w-4" />
             </IconButton>
           </div>
         </div>
