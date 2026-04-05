@@ -1040,14 +1040,10 @@ function GraphChatApp() {
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="text-sm font-semibold tracking-[0.02em] text-[var(--text-dim)]">Projects</div>
-            {isProjectDirty && <span className="text-xs text-[var(--accent)]">●</span>}
           </div>
           <div className="flex items-center gap-1">
             <IconButton onClick={() => void createProject()} label="Create project">
               <NewFolderIcon className="h-4 w-4" />
-            </IconButton>
-            <IconButton onClick={() => void saveProject()} label="Save project" disabled={!isProjectDirty}>
-              <SaveIcon className="h-4 w-4" />
             </IconButton>
           </div>
         </div>
@@ -1075,15 +1071,25 @@ function GraphChatApp() {
                   )}
                   <div className={`truncate text-[11px] ${project.id === activeProjectId ? 'text-[var(--text-dim)]' : 'text-[var(--text-faint)]'}`}>{new Date(project.updatedAt).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
-                <button
-                  className={`rounded-full px-2 py-1 text-sm ${project.id === activeProjectId ? 'text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]' : 'text-[var(--text-faint)] hover:bg-white/5 hover:text-[var(--text-dim)]'}`}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setProjectMenu((current) => current?.projectId === project.id ? null : { projectId: project.id })
-                  }}
-                >
-                  ...
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  {project.id === activeProjectId && isProjectDirty && (
+                    <>
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                      <IconButton onClick={() => void saveProject()} label="Save project">
+                        <SaveIcon className="h-3.5 w-3.5" />
+                      </IconButton>
+                    </>
+                  )}
+                  <button
+                    className={`rounded-full px-2 py-1 text-sm ${project.id === activeProjectId ? 'text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]' : 'text-[var(--text-faint)] hover:bg-white/5 hover:text-[var(--text-dim)]'}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setProjectMenu((current) => current?.projectId === project.id ? null : { projectId: project.id })
+                    }}
+                  >
+                    ...
+                  </button>
+                </div>
               </div>
               {projectMenu?.projectId === project.id && (
                 <div
