@@ -11,6 +11,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useViewport,
   type Connection,
   type Edge,
   type Node,
@@ -1313,6 +1314,10 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const [draftContent, setDraftContent] = useState(node.content)
   const [isComposing, setIsComposing] = useState(false)
   const wasEditingRef = useRef(data.isEditing)
+  const { zoom } = useViewport()
+  const FADE_START = 0.65
+  const FADE_END = 0.5
+  const externalTitleOpacity = zoom >= FADE_START ? 0 : zoom <= FADE_END ? 1 : (FADE_START - zoom) / (FADE_START - FADE_END)
   const colors = {
     text: 'border-[#6b7280] bg-[var(--bg-card)]',
     context: 'border-[rgb(90,100,210)] bg-[var(--bg-card)]',
@@ -1335,6 +1340,19 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
 
   return (
     <div className={`relative h-full w-full rounded-3xl border-2 px-9 py-6 shadow-lg shadow-black/30 transition ${colors[node.type]} ${data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
+      {externalTitleOpacity > 0 && (
+        <div
+          className="pointer-events-none absolute left-0 whitespace-nowrap font-serif font-semibold text-[var(--text)]"
+          style={{
+            bottom: `calc(100% + ${6 / zoom}px)`,
+            fontSize: `${12 / zoom}px`,
+            opacity: externalTitleOpacity,
+            lineHeight: 1.2,
+          }}
+        >
+          {node.title || 'Untitled'}
+        </div>
+      )}
       <NodeResizeControl
         position="bottom-right"
         className={`${data.isSelected ? 'opacity-100' : 'opacity-0 pointer-events-none'} !h-3 !w-3 !rounded-[6px] !border !border-[var(--text-faint)] !bg-[var(--text)] shadow`}
