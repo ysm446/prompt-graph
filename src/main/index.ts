@@ -23,6 +23,7 @@ const defaultUiPreferences: UiPreferences = {
   proofreadSystemPrompt: 'You are a proofreader. Return only the corrected text with no explanation, no markdown formatting, and no additional comments. Preserve the original language and style.',
   leftSidebarWidth: 288,
   rightInspectorWidth: 380,
+  nodeFontSize: 14,
   generalSections: {
     context: true,
     interface: true,
@@ -573,6 +574,7 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     proofreadSystemPrompt: input.proofreadSystemPrompt ?? defaultUiPreferences.proofreadSystemPrompt,
     leftSidebarWidth: input.leftSidebarWidth ?? defaultUiPreferences.leftSidebarWidth,
     rightInspectorWidth: input.rightInspectorWidth ?? defaultUiPreferences.rightInspectorWidth,
+    nodeFontSize: input.nodeFontSize ?? defaultUiPreferences.nodeFontSize,
     generalSections: {
       context: input.generalSections?.context ?? defaultUiPreferences.generalSections.context,
       interface: input.generalSections?.interface ?? defaultUiPreferences.generalSections.interface,

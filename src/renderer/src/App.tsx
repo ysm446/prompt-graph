@@ -136,6 +136,7 @@ function GraphChatApp() {
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
   const [rightInspectorWidth, setRightInspectorWidth] = useState(DEFAULT_RIGHT_INSPECTOR_WIDTH)
   const [generalSections, setGeneralSections] = useState({ context: true, interface: true, editing: true })
+  const [nodeFontSize, setNodeFontSize] = useState(14)
   const [modelFilter, setModelFilter] = useState('')
   const [projectDialog, setProjectDialog] = useState<ProjectDialogState>(null)
   const [projectMenu, setProjectMenu] = useState<ProjectMenuState>(null)
@@ -170,6 +171,7 @@ function GraphChatApp() {
       setLeftSidebarWidth(uiPreferences.leftSidebarWidth)
       setRightInspectorWidth(uiPreferences.rightInspectorWidth)
       setGeneralSections(uiPreferences.generalSections)
+      if (uiPreferences.nodeFontSize) setNodeFontSize(uiPreferences.nodeFontSize)
       setActiveProjectId(snapshot.project.id)
       applySnapshot(snapshot)
       setIsProjectDirty(false)
@@ -192,10 +194,11 @@ function GraphChatApp() {
       isProofreadEnabled,
       leftSidebarWidth,
       rightInspectorWidth,
-      generalSections
+      generalSections,
+      nodeFontSize
     }
     void window.graphChat.savePreferences(payload)
-  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, leftSidebarWidth, rightInspectorWidth, generalSections])
+  }, [isSidebarOpen, isInspectorOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, leftSidebarWidth, rightInspectorWidth, generalSections, nodeFontSize])
 
   useEffect(() => {
     setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, isGenerating: generation?.nodeId === node.id } })))
@@ -1204,7 +1207,7 @@ function GraphChatApp() {
       </>
       )}
 
-      <main ref={mainRef} className="relative flex-1">
+      <main ref={mainRef} className="relative flex-1" style={{ '--node-font-size': `${nodeFontSize}px` } as React.CSSProperties}>
         {error && <div className="absolute right-4 top-4 z-20 max-w-md rounded-2xl border border-red-500/40 bg-red-950/70 px-4 py-3 text-sm text-red-200 shadow">{error}</div>}
         {!hasNodes && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-10">
@@ -1469,12 +1472,14 @@ function GraphChatApp() {
             isSnapToGridEnabled={isSnapToGridEnabled}
             edgeType={edgeType}
             isProofreadEnabled={isProofreadEnabled}
+            nodeFontSize={nodeFontSize}
             sections={generalSections}
             onToggleSection={(section) => setGeneralSections((current) => ({ ...current, [section]: !current[section] }))}
             onToggleMiniMap={() => setIsMiniMapVisible((current) => !current)}
             onToggleSnapToGrid={toggleSnapToGrid}
             onChangeEdgeType={setEdgeType}
             onToggleProofread={() => setIsProofreadEnabled((current) => !current)}
+            onChangeNodeFontSize={setNodeFontSize}
             proofreadSystemPrompt={proofreadSystemPrompt}
             onSaveProofreadSystemPrompt={(value) => {
               const resolved = value.trim() === '' ? DEFAULT_PROOFREAD_SYSTEM_PROMPT : value
@@ -1652,11 +1657,13 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
             }}
             onMouseDown={(event) => event.stopPropagation()}
             placeholder="No content yet."
-            className="node-scrollbar nodrag nopan nowheel flex-1 resize-none overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[rgba(0,0,0,0.14)] px-3 py-2 text-sm leading-6 text-[var(--text)] outline-none"
+            className="node-scrollbar nodrag nopan nowheel flex-1 resize-none overflow-y-auto rounded-md border border-[var(--border-strong)] bg-[rgba(0,0,0,0.14)] px-3 py-2 leading-6 text-[var(--text)] outline-none"
+            style={{ fontSize: 'var(--node-font-size)' }}
           />
         ) : (
           <div
-            className={`node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-sm leading-6 text-[var(--text)]${data.isSelected ? ' nowheel' : ''}`}
+            className={`node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 leading-6 text-[var(--text)]${data.isSelected ? ' nowheel' : ''}`}
+            style={{ fontSize: 'var(--node-font-size)' }}
             onDoubleClick={() => data.onStartEdit(node.id)}
           >{node.content || 'No content yet.'}</div>
         )}
@@ -1813,6 +1820,7 @@ function GeneralInspector({
   isSnapToGridEnabled,
   edgeType,
   isProofreadEnabled,
+  nodeFontSize,
   proofreadSystemPrompt,
   sections,
   onToggleSection,
@@ -1820,6 +1828,7 @@ function GeneralInspector({
   onToggleSnapToGrid,
   onChangeEdgeType,
   onToggleProofread,
+  onChangeNodeFontSize,
   onSaveProofreadSystemPrompt,
   onChangeContextLength,
   onChangeTemperature
@@ -1829,6 +1838,7 @@ function GeneralInspector({
   isSnapToGridEnabled: boolean
   edgeType: 'default' | 'smoothstep' | 'step'
   isProofreadEnabled: boolean
+  nodeFontSize: number
   proofreadSystemPrompt: string
   sections: { context: boolean; interface: boolean; editing: boolean }
   onToggleSection: (section: 'context' | 'interface' | 'editing') => void
@@ -1836,6 +1846,7 @@ function GeneralInspector({
   onToggleSnapToGrid: () => void
   onChangeEdgeType: (value: 'default' | 'smoothstep' | 'step') => void
   onToggleProofread: () => void
+  onChangeNodeFontSize: (value: number) => void
   onSaveProofreadSystemPrompt: (value: string) => void
   onChangeContextLength: (value: number) => void
   onChangeTemperature: (value: number) => void
@@ -2001,6 +2012,29 @@ function GeneralInspector({
             <option value="smoothstep">Smooth Step</option>
             <option value="step">Step</option>
           </select>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-[13px] text-[var(--text-dim)]">Text Size</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={11}
+              max={22}
+              step={1}
+              value={nodeFontSize}
+              onChange={(e) => onChangeNodeFontSize(Number(e.target.value))}
+              className={`graph-slider w-28 ${nodeFontSize !== 14 ? 'graph-slider-active' : ''}`}
+            />
+            <input
+              type="number"
+              min={11}
+              max={22}
+              step={1}
+              value={nodeFontSize}
+              onChange={(e) => onChangeNodeFontSize(Math.min(22, Math.max(11, Number(e.target.value) || 14)))}
+              className="h-7 w-[52px] rounded-[9px] border border-[var(--border-strong)] bg-[rgba(28,31,43,0.88)] px-2 py-1 text-right text-[12px] text-[var(--text)] outline-none"
+            />
+          </div>
         </div>
       </InspectorSection>
 

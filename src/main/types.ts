@@ -86,6 +86,7 @@ export interface UiPreferences {
   proofreadSystemPrompt: string
   leftSidebarWidth: number
   rightInspectorWidth: number
+  nodeFontSize: number
   generalSections: {
     context: boolean
     interface: boolean
