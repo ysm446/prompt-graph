@@ -1909,11 +1909,16 @@ function NodeEditor({
     setIsEditingDetails(false)
   }
 
+  function startDetailsEdit() {
+    if (disabled) return
+    setIsEditingDetails(true)
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-5">
       <div className="mb-4 flex flex-wrap gap-2">
         {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" variant="accent" />}
-        <ToolbarButton onClick={() => setIsEditingDetails((current) => !current)} label={isEditingDetails ? 'Close' : 'Edit'} />
+        <ToolbarButton onClick={() => setIsEditingDetails((current) => !current)} label={isEditingDetails ? 'Done' : 'Edit'} />
       </div>
       {isEditingDetails ? (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -1954,11 +1959,23 @@ function NodeEditor({
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-5 px-1">
             <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Title</div>
-            <div className="mt-2 text-[var(--text)]" style={{ fontFamily: 'var(--node-title-font-family)', fontSize: 'var(--node-title-font-size)', fontWeight: 'var(--node-title-font-weight)', letterSpacing: 'var(--node-title-letter-spacing)' }}>{node.title || 'Untitled'}</div>
+            <div
+              className={`mt-2 text-[var(--text)] ${disabled ? '' : 'cursor-text'}`}
+              onDoubleClick={startDetailsEdit}
+              style={{ fontFamily: 'var(--node-title-font-family)', fontSize: 'var(--node-title-font-size)', fontWeight: 'var(--node-title-font-weight)', letterSpacing: 'var(--node-title-letter-spacing)' }}
+            >
+              {node.title || 'Untitled'}
+            </div>
           </div>
           <div className="mb-5 flex min-h-0 flex-1 flex-col px-1">
             <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Content</div>
-            <div className="inspector-scrollbar min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-[var(--text)]" style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}>{node.content || 'No content yet.'}</div>
+            <div
+              className={`inspector-scrollbar min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-[var(--text)] ${disabled ? '' : 'cursor-text'}`}
+              onDoubleClick={startDetailsEdit}
+              style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}
+            >
+              {node.content || 'No content yet.'}
+            </div>
             {estimatedContentTokens !== null && (
               <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
                 <MessageIcon className="h-3.5 w-3.5" />
