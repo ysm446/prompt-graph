@@ -34,7 +34,6 @@ type AppNodeData = {
   onStartEdit: (id: string) => void
   onStopEdit: () => void
   onGenerate: (id: string) => void
-  onOpenReader: (id: string) => void
   onProofreadRequest: (payload: { nodeId: string; text: string; selectionStart: number; selectionEnd: number; fullContent: string; rect: DOMRect }) => void
   onResize: (id: string, input: { position: { x: number; y: number }; size: { width: number; height: number } }) => void
 }
@@ -70,12 +69,6 @@ type CopiedSelection = {
 }
 
 type ResizeSide = 'left' | 'right'
-
-type ReaderState = {
-  nodeId: string
-  title: string
-  content: string
-}
 
 const DEFAULT_PROOFREAD_SYSTEM_PROMPT = 'You are a proofreader. Return only the corrected text with no explanation, no markdown formatting, and no additional comments. Preserve the original language and style.'
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 288
@@ -195,7 +188,6 @@ function GraphChatApp() {
   const [isProjectDirty, setIsProjectDirty] = useState(false)
   const [status, setStatus] = useState('Loading...')
   const [error, setError] = useState<string | null>(null)
-  const [reader, setReader] = useState<ReaderState | null>(null)
   const [generation, setGeneration] = useState<{ generationId: string; nodeId: string } | null>(null)
   const [generationQueue, setGenerationQueue] = useState<string[]>([])
   const [proofread, setProofread] = useState<{
@@ -528,7 +520,6 @@ function GraphChatApp() {
         },
         onStopEdit: () => setEditingNodeId(null),
         onGenerate: handleGenerate,
-        onOpenReader: openReader,
         onProofreadRequest: handleProofreadRequest,
         onResize: handleResize
       }
@@ -815,25 +806,6 @@ function GraphChatApp() {
     setProofread(null)
   }
 
-  function openReader(nodeId: string) {
-    const snapshot = snapshotRef.current
-    if (!snapshot) return
-    setEditingNodeId(null)
-    const content = collectReaderText(nodeId, snapshot.nodes, snapshot.edges)
-    const title = snapshot.nodes.find((node) => node.id === nodeId)?.title || 'Reader View'
-    setReader({ nodeId, title, content })
-  }
-
-  async function exportReader() {
-    if (!reader) return
-    await window.graphChat.exportReader(reader.title, reader.content)
-  }
-
-  function copyReader() {
-    if (!reader) return
-    void navigator.clipboard.writeText(reader.content)
-  }
-
   function getSelectedNodeRecords(nodeIds: string[]) {
     const snapshot = snapshotRef.current
     if (!snapshot || nodeIds.length === 0) return []
@@ -878,25 +850,6 @@ function GraphChatApp() {
     setIsProjectDirty(true)
     setNodeMenu(null)
     setStatus('Node deleted')
-  }
-
-  async function clearNode(nodeId: string) {
-    const graphNode = snapshotRef.current?.nodes.find((node) => node.id === nodeId)
-    if (!graphNode) return
-    const updated = {
-      ...graphNode,
-      content: '',
-      isGenerated: false,
-      generationMeta: null,
-      updatedAt: new Date().toISOString()
-    }
-    mutateLocalNode(updated)
-    setIsProjectDirty(true)
-    if (reader?.nodeId === nodeId) {
-      setReader({ ...reader, content: '' })
-    }
-    setNodeMenu(null)
-    setStatus('Node content cleared')
   }
 
   async function duplicateSelection(selection: CopiedSelection, options?: { targetCenter?: { x: number; y: number }; clearTextContent?: boolean; offset?: { x: number; y: number } }) {
@@ -1384,16 +1337,6 @@ function GraphChatApp() {
           >
             {nodeMenuNode.type === 'text' && (
               <MenuAction
-                label="Open Reader"
-                onClick={() => {
-                  openReader(nodeMenuNode.id)
-                  setNodeMenu(null)
-                  setStatus('Reader opened')
-                }}
-              />
-            )}
-            {nodeMenuNode.type === 'text' && (
-              <MenuAction
                 label="Generate From Here"
                 onClick={() => {
                   void handleGenerate(nodeMenuNode.id)
@@ -1414,12 +1357,6 @@ function GraphChatApp() {
               label="Duplicate Node"
               onClick={() => {
                 void duplicateNode(nodeMenuNode.id)
-              }}
-            />
-            <MenuAction
-              label="Clear Content"
-              onClick={() => {
-                void clearNode(nodeMenuNode.id)
               }}
             />
             <MenuAction
@@ -1604,31 +1541,16 @@ function GraphChatApp() {
                 disabled={generation?.nodeId === selectedNode.id}
                 currentModelName={settings?.selectedModelName ?? null}
                 contextLength={settings?.contextLength ?? null}
-                onOpenReader={() => openReader(selectedNode.id)}
                 onGenerate={() => void handleGenerate(selectedNode.id)}
                 onChange={(updated) => {
                   mutateLocalNode(updated)
                   void persistNode(updated)
                 }}
                 onDuplicate={() => void duplicateNode(selectedNode.id)}
-                onClear={() => void clearNode(selectedNode.id)}
                 onDelete={() => void removeSelected()}
               />
             ) : (
               <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-[var(--text-dim)]">Select a single node to edit its title, content, and generation details.</div>
-            )}
-            {reader && (
-              <div className="border-t border-[var(--border)] bg-[rgba(28,31,43,0.84)] p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h3 className="font-serif text-lg font-semibold">{reader.title}</h3>
-                  <button className="text-sm text-[var(--text-dim)]" onClick={() => setReader(null)}>Close</button>
-                </div>
-                <div className="mb-3 flex gap-2">
-                  <ToolbarButton onClick={copyReader} label="Copy" />
-                  <ToolbarButton onClick={() => void exportReader()} label="Export" />
-                </div>
-                <textarea readOnly value={reader.content} className="h-56 w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg)] p-3 text-sm text-[var(--text)]" />
-              </div>
             )}
           </section>
         )}
@@ -1909,7 +1831,6 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
         </div>
         <div className="hidden mt-3 justify-between text-xs text-[var(--text-dim)]">
           <div className="flex items-center gap-3">
-            <button className="nodrag nopan" onClick={() => data.onOpenReader(node.id)}>Reader</button>
             <button className="nodrag nopan" onClick={() => {
               if (data.isEditing) {
                 commitDraft()
@@ -1933,22 +1854,18 @@ function NodeEditor({
   disabled,
   currentModelName,
   contextLength,
-  onOpenReader,
   onGenerate,
   onChange,
   onDuplicate,
-  onClear,
   onDelete
 }: {
   node: GraphNodeRecord
   disabled: boolean
   currentModelName: string | null
   contextLength: number | null
-  onOpenReader: () => void
   onGenerate: () => void
   onChange: (node: GraphNodeRecord) => void
   onDuplicate: () => void
-  onClear: () => void
   onDelete: () => void
 }) {
   const totalTokens = node.generationMeta?.totalTokens ?? null
@@ -1995,10 +1912,8 @@ function NodeEditor({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-5">
       <div className="mb-4 flex flex-wrap gap-2">
-        <ToolbarButton onClick={onOpenReader} label="Open Reader" />
-        {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" />}
+        {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" variant="accent" />}
         <ToolbarButton onClick={() => setIsEditingDetails((current) => !current)} label={isEditingDetails ? 'Close' : 'Edit'} />
-        <ToolbarButton onClick={onClear} label="Clear" />
       </div>
       {isEditingDetails ? (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -2070,10 +1985,8 @@ function NodeEditor({
           {totalTokens !== null && contextLength && contextUsagePercent !== null && (
             <div className="mt-3 flex items-center gap-3 text-xs text-[var(--text-dim)]">
               <ContextUsageGauge percent={contextUsagePercent} />
-              <div className="leading-5">
-                <div>{totalTokens} / {contextLength} tokens</div>
-                <div className="text-[var(--text-faint)]">Context usage {contextUsagePercent.toFixed(1)}%</div>
-              </div>
+              <div className="leading-5">{totalTokens} / {contextLength} tokens</div>
+              <div className="leading-5 text-[var(--text-faint)]">Context usage {contextUsagePercent.toFixed(1)}%</div>
             </div>
           )}
         </div>
@@ -2438,8 +2351,12 @@ function InspectorSection({
   )
 }
 
-function ToolbarButton({ onClick, label }: { onClick: () => void; label: string }) {
-  return <button className="rounded-md border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm font-medium text-[var(--text)] shadow-sm hover:bg-white/5" onClick={onClick}>{label}</button>
+function ToolbarButton({ onClick, label, variant = 'default' }: { onClick: () => void; label: string; variant?: 'default' | 'accent' }) {
+  const className = variant === 'accent'
+    ? 'rounded-md border border-[var(--accent-border)] bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-hover)]'
+    : 'rounded-md border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-4 py-2 text-sm font-medium text-[var(--text)] shadow-sm transition hover:bg-white/5'
+
+  return <button className={className} onClick={onClick}>{label}</button>
 }
 
 function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
@@ -2448,28 +2365,27 @@ function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
 
 function ContextUsageGauge({ percent }: { percent: number }) {
   const normalizedPercent = Math.max(0, Math.min(percent, 100))
-  const radius = 11
+  const radius = 9
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - normalizedPercent / 100)
 
   return (
-    <div className="flex items-center gap-2 text-[var(--accent)]">
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-        <circle cx="17" cy="17" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+    <div className="shrink-0 text-[var(--accent)]">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <circle cx="14" cy="14" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
         <circle
-          cx="17"
-          cy="17"
+          cx="14"
+          cy="14"
           r={radius}
           fill="none"
           stroke="currentColor"
-          strokeWidth="3"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
-          transform="rotate(-90 17 17)"
+          transform="rotate(-90 14 14)"
         />
       </svg>
-      <span className="text-sm font-medium">{normalizedPercent.toFixed(1)}%</span>
     </div>
   )
 }
@@ -2843,32 +2759,6 @@ function extractModelParams(modelName: string): string | null {
 function formatModelSize(sizeBytes: number): string {
   const gib = sizeBytes / 1024 ** 3
   return `${gib.toFixed(2)} GB`
-}
-
-function collectReaderText(nodeId: string, nodes: GraphNodeRecord[], edges: GraphEdgeRecord[]): string {
-  const nodeMap = new Map(nodes.map((node) => [node.id, node]))
-  return collectReaderTextUpstream(nodeId, edges, nodeMap, new Set<string>())
-    .map((node) => node.content.trim())
-    .filter(Boolean)
-    .join('\n\n')
-}
-
-function collectReaderTextUpstream(
-  nodeId: string,
-  edges: GraphEdgeRecord[],
-  nodeMap: Map<string, GraphNodeRecord>,
-  visited: Set<string>
-): GraphNodeRecord[] {
-  const results: GraphNodeRecord[] = []
-  for (const edge of edges) {
-    if (edge.targetId !== nodeId || resolveTargetHandleForEdge(edge, nodeMap) !== 'text') continue
-    const parent = nodeMap.get(edge.sourceId)
-    if (!parent || parent.type !== 'text' || visited.has(parent.id)) continue
-    visited.add(parent.id)
-    results.push(...collectReaderTextUpstream(parent.id, edges, nodeMap, visited))
-    results.push(parent)
-  }
-  return results
 }
 
 function wouldCreateCycle(sourceId: string, targetId: string, edges: GraphEdgeRecord[]): boolean {

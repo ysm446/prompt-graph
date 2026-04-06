@@ -62,8 +62,8 @@ function getLlamaServer(): LlamaServerManager {
 function createWindow(): void {
   const iconPath = resolveIconPath()
   const window = new BrowserWindow({
-    width: 1600,
-    height: 980,
+    width: 1800,
+    height: 1000,
     minWidth: 1200,
     minHeight: 800,
     backgroundColor: '#d8d1c5',
@@ -635,6 +635,3 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     }
   }
 }
-
-
-
