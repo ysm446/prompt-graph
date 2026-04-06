@@ -612,6 +612,16 @@ function GraphChatApp() {
     }
   }
 
+  function handleGenerateDownstream(nodeId: string) {
+    const snapshot = snapshotRef.current
+    if (!snapshot) return
+    const downstream = collectDownstreamTextNodes(nodeId, snapshot.nodes, snapshot.edges)
+    const all = [nodeId, ...downstream]
+    const [first, ...rest] = all
+    setGenerationQueue((current) => [...current, ...rest])
+    void handleGenerate(first)
+  }
+
   async function stopGeneration() {
     if (!generation) return
     await window.graphChat.stopGeneration(generation.generationId)
@@ -1237,6 +1247,15 @@ function GraphChatApp() {
                 label="Generate From Here"
                 onClick={() => {
                   void handleGenerate(nodeMenuNode.id)
+                  setNodeMenu(null)
+                }}
+              />
+            )}
+            {nodeMenuNode.type === 'text' && (
+              <MenuAction
+                label="Generate Downstream"
+                onClick={() => {
+                  handleGenerateDownstream(nodeMenuNode.id)
                   setNodeMenu(null)
                 }}
               />
@@ -2315,6 +2334,56 @@ function defaultTitle(type: NodeType): string {
   }
 }
 
+function collectDownstreamTextNodes(sourceNodeId: string, nodes: GraphNodeRecord[], edges: GraphEdgeRecord[]): string[] {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+  // Build adjacency: sourceId -> [targetId, ...]
+  const adj = new Map<string, string[]>()
+  for (const edge of edges) {
+    if (!adj.has(edge.sourceId)) adj.set(edge.sourceId, [])
+    adj.get(edge.sourceId)!.push(edge.targetId)
+  }
+  // BFS to collect all downstream text nodes (excluding the source itself)
+  const visited = new Set<string>()
+  const queue = [sourceNodeId]
+  visited.add(sourceNodeId)
+  const textNodes: string[] = []
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    for (const targetId of adj.get(current) ?? []) {
+      if (visited.has(targetId)) continue
+      visited.add(targetId)
+      const target = nodeMap.get(targetId)
+      if (target?.type === 'text') {
+        textNodes.push(targetId)
+        queue.push(targetId)
+      }
+    }
+  }
+  // Topological sort via Kahn's algorithm (respects upstream dependencies)
+  const inDegree = new Map<string, number>()
+  const subAdj = new Map<string, string[]>()
+  const nodeSet = new Set(textNodes)
+  for (const id of textNodes) { inDegree.set(id, 0); subAdj.set(id, []) }
+  for (const edge of edges) {
+    if (nodeSet.has(edge.sourceId) && nodeSet.has(edge.targetId)) {
+      subAdj.get(edge.sourceId)!.push(edge.targetId)
+      inDegree.set(edge.targetId, (inDegree.get(edge.targetId) ?? 0) + 1)
+    }
+  }
+  const sorted: string[] = []
+  const ready = textNodes.filter((id) => inDegree.get(id) === 0)
+  while (ready.length > 0) {
+    const id = ready.shift()!
+    sorted.push(id)
+    for (const next of subAdj.get(id) ?? []) {
+      const deg = (inDegree.get(next) ?? 1) - 1
+      inDegree.set(next, deg)
+      if (deg === 0) ready.push(next)
+    }
+  }
+  return sorted
+}
+
 function displayNodeTypeLabel(type: NodeType, isLocal = false): string {
   if (type === 'instruction') return isLocal ? 'local instruction' : 'global instruction'
   if (type === 'context') return isLocal ? 'local context' : 'global context'
@@ -2487,7 +2556,7 @@ function edgeStyleForHandle(handle: TextInputHandle | null) {
   if (handle === 'instruction') {
     return { strokeWidth: 2.6, stroke: '#a267c8', opacity: 0.84 }
   }
-  return { strokeWidth: 2.6, stroke: '#6a728f', opacity: 0.84 }
+  return { strokeWidth: 4, stroke: '#6a728f', opacity: 0.84 }
 }
 
 function selectedEdgeStyleForHandle(handle: TextInputHandle | null) {
@@ -2497,7 +2566,7 @@ function selectedEdgeStyleForHandle(handle: TextInputHandle | null) {
   if (handle === 'instruction') {
     return { strokeWidth: 3.5, stroke: '#bf79df', opacity: 1 }
   }
-  return { strokeWidth: 3.5, stroke: '#8b95b8', opacity: 1 }
+  return { strokeWidth: 5, stroke: '#8b95b8', opacity: 1 }
 }
 
 export default App
