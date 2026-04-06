@@ -2033,14 +2033,16 @@ function NodeEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-5">
-      <div className="mb-4 flex flex-wrap gap-2">
-        {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" variant="accent" />}
-        <ToolbarButton onClick={() => setIsEditingDetails((current) => !current)} label={isEditingDetails ? 'Done' : 'Edit'} />
-      </div>
       {isEditingDetails ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <label className="mb-4 block">
-            <div className="mb-2 text-sm font-medium text-[var(--text-dim)]">Title</div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-sm font-medium text-[var(--text-dim)]">Title</div>
+              <div className="flex flex-wrap items-center gap-2">
+                {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" variant="accent" />}
+                <ToolbarButton onClick={() => setIsEditingDetails(false)} label="Done" />
+              </div>
+            </div>
             <input value={draftTitle} disabled={disabled} onChange={(event) => setDraftTitle(event.target.value)} className="w-full rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm outline-none" />
           </label>
           <label className="mb-4 flex min-h-0 flex-1 flex-col">
@@ -2075,13 +2077,21 @@ function NodeEditor({
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-5 px-1">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Title</div>
-            <div
-              className={`mt-2 text-[var(--text)] ${disabled ? '' : 'cursor-text'}`}
-              onDoubleClick={startDetailsEdit}
-              style={{ fontFamily: 'var(--node-title-font-family)', fontSize: 'var(--node-title-font-size)', fontWeight: 'var(--node-title-font-weight)', letterSpacing: 'var(--node-title-letter-spacing)' }}
-            >
-              {node.title || 'Untitled'}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-faint)]">Title</div>
+                <div
+                  className={`mt-2 text-[var(--text)] ${disabled ? '' : 'cursor-text'}`}
+                  onDoubleClick={startDetailsEdit}
+                  style={{ fontFamily: 'var(--node-title-font-family)', fontSize: 'var(--node-title-font-size)', fontWeight: 'var(--node-title-font-weight)', letterSpacing: 'var(--node-title-letter-spacing)' }}
+                >
+                  {node.title || 'Untitled'}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1">
+                {node.type === 'text' && <ToolbarButton onClick={onGenerate} label="Generate" variant="accent" />}
+                <ToolbarButton onClick={startDetailsEdit} label="Edit" />
+              </div>
             </div>
           </div>
           <div className="mb-5 flex min-h-0 flex-1 flex-col px-1">
