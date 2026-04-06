@@ -3,6 +3,7 @@ export type TextInputHandle = 'text' | 'context' | 'instruction'
 export type NodeOutputHandle = 'output'
 export type TextStyleTarget = 'both' | 'title' | 'content'
 export type TextStylePreset = 'standard' | 'business' | 'reading' | 'dense'
+export type ProofreadPreset = 'light' | 'standard' | 'aggressive' | 'custom'
 
 export interface ProjectRecord {
   id: string
@@ -87,6 +88,7 @@ export interface UiPreferences {
   isSnapToGridEnabled: boolean
   edgeType: 'default' | 'smoothstep' | 'step'
   isProofreadEnabled: boolean
+  proofreadPreset: ProofreadPreset
   proofreadSystemPrompt: string
   leftSidebarWidth: number
   rightInspectorWidth: number

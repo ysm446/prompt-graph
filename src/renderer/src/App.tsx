@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import {
   Background,
   Controls,
@@ -22,7 +22,7 @@ import {
   type OnNodesChange
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeType, ProjectRecord, ProjectSnapshot, TextInputHandle, TextStylePreset, TextStyleTarget, UiPreferences } from '../../main/types'
+import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeType, ProjectRecord, ProjectSnapshot, ProofreadPreset, TextInputHandle, TextStylePreset, TextStyleTarget, UiPreferences } from '../../main/types'
 
 type AppNodeData = {
   graphNode: GraphNodeRecord
@@ -34,8 +34,19 @@ type AppNodeData = {
   onStartEdit: (id: string) => void
   onStopEdit: () => void
   onGenerate: (id: string) => void
-  onProofreadRequest: (payload: { nodeId: string; text: string; selectionStart: number; selectionEnd: number; fullContent: string; rect: DOMRect }) => void
+  onProofreadRequest: (payload: ProofreadRequestPayload) => void
   onResize: (id: string, input: { position: { x: number; y: number }; size: { width: number; height: number } }) => void
+}
+
+type ProofreadRequestPayload = {
+  nodeId: string
+  text: string
+  selectionStart: number
+  selectionEnd: number
+  fullContent: string
+  rect: DOMRect
+  side?: 'left' | 'right'
+  onApply?: (nextContent: string) => void
 }
 
 type CanvasMenuState = {
@@ -70,7 +81,24 @@ type CopiedSelection = {
 
 type ResizeSide = 'left' | 'right'
 
-const DEFAULT_PROOFREAD_SYSTEM_PROMPT = 'You are a proofreader. Return only the corrected text with no explanation, no markdown formatting, and no additional comments. Preserve the original language and style.'
+const DEFAULT_PROOFREAD_SYSTEM_PROMPT = 'あなたは校正者です。説明は付けず、修正後の文章だけを返してください。Markdown は使わず、余計なコメントも付けないでください。元の言語と文体は維持してください。'
+const PROOFREAD_PRESETS: Record<Exclude<ProofreadPreset, 'custom'>, { label: string; description: string; prompt: string }> = {
+  light: {
+    label: 'Light',
+    description: 'Minimal corrections for typos and awkward phrasing.',
+    prompt: '\u3042\u306a\u305f\u306f\u65e5\u672c\u8a9e\u306e\u6821\u6b63\u8005\u3067\u3059\u3002\u5143\u306e\u610f\u5473\u3068\u6587\u4f53\u3092\u3067\u304d\u308b\u3060\u3051\u4fdd\u3061\u306a\u304c\u3089\u3001\u8aa4\u5b57\u8131\u5b57\u3001\u8868\u8a18\u3086\u308c\u3001\u4e0d\u81ea\u7136\u306a\u8a00\u3044\u56de\u3057\u3060\u3051\u3092\u6700\u5c0f\u9650\u306b\u4fee\u6b63\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u8aac\u660e\u306f\u4ed8\u3051\u305a\u3001\u4fee\u6b63\u5f8c\u306e\u6587\u7ae0\u3060\u3051\u3092\u8fd4\u3057\u3066\u304f\u3060\u3055\u3044\u3002'
+  },
+  standard: {
+    label: 'Standard',
+    description: 'Natural cleanup while preserving meaning and tone.',
+    prompt: '\u3042\u306a\u305f\u306f\u512a\u79c0\u306a\u65e5\u672c\u8a9e\u30a8\u30c7\u30a3\u30bf\u3067\u3059\u3002\u6587\u7ae0\u306e\u610f\u5473\u3068\u7b46\u8005\u306e\u610f\u56f3\u3092\u4fdd\u3063\u305f\u307e\u307e\u3001\u3088\u308a\u81ea\u7136\u3067\u8aad\u307f\u3084\u3059\u3044\u65e5\u672c\u8a9e\u306b\u6574\u3048\u3066\u304f\u3060\u3055\u3044\u3002\u5fc5\u8981\u306b\u5fdc\u3058\u3066\u8a9e\u9806\u3084\u8868\u73fe\u3092\u8abf\u6574\u3057\u3001\u4e0d\u81ea\u7136\u306a\u8a00\u3044\u56de\u3057\u3001\u5197\u9577\u3055\u3001\u91cd\u8907\u3092\u6539\u5584\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u8aac\u660e\u306f\u4ed8\u3051\u305a\u3001\u4fee\u6b63\u5f8c\u306e\u6587\u7ae0\u3060\u3051\u3092\u8fd4\u3057\u3066\u304f\u3060\u3055\u3044\u3002Markdown \u306f\u4f7f\u308f\u306a\u3044\u3067\u304f\u3060\u3055\u3044\u3002'
+  },
+  aggressive: {
+    label: 'Aggressive',
+    description: 'More active rewriting for clarity and flow.',
+    prompt: '\u3042\u306a\u305f\u306f\u30d7\u30ed\u306e\u7de8\u96c6\u8005\u3067\u3059\u3002\u5143\u306e\u610f\u56f3\u3092\u4fdd\u3061\u306a\u304c\u3089\u3001\u6587\u7ae0\u3092\u3088\u308a\u660e\u5feb\u3067\u6d17\u7df4\u3055\u308c\u305f\u65e5\u672c\u8a9e\u306b\u66f8\u304d\u76f4\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u5197\u9577\u306a\u8868\u73fe\u306f\u7c21\u6f54\u306b\u3057\u3001\u66d6\u6627\u306a\u7b87\u6240\u306f\u81ea\u7136\u306a\u7bc4\u56f2\u3067\u88dc\u3044\u3001\u5168\u4f53\u306e\u6d41\u308c\u304c\u826f\u304f\u306a\u308b\u3088\u3046\u306b\u6574\u3048\u3066\u304f\u3060\u3055\u3044\u3002\u8aac\u660e\u306f\u4e0d\u8981\u3067\u3059\u3002\u5b8c\u6210\u3057\u305f\u6587\u7ae0\u3060\u3051\u3092\u8fd4\u3057\u3066\u304f\u3060\u3055\u3044\u3002Markdown \u306f\u4f7f\u308f\u306a\u3044\u3067\u304f\u3060\u3055\u3044\u3002'
+  }
+}
 const DEFAULT_LEFT_SIDEBAR_WIDTH = 288
 const DEFAULT_SETTINGS_PANEL_WIDTH = 340
 const DEFAULT_RIGHT_INSPECTOR_WIDTH = 520
@@ -200,6 +228,7 @@ function GraphChatApp() {
     selectionEnd: number
     fullContent: string
     position: { top: number; left: number }
+    onApply?: (nextContent: string) => void
   } | null>(null)
   const proofreadRef = useRef(proofread)
   const [canvasMenu, setCanvasMenu] = useState<CanvasMenuState>(null)
@@ -214,6 +243,7 @@ function GraphChatApp() {
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true)
   const [edgeType, setEdgeType] = useState<'default' | 'smoothstep' | 'step'>('default')
   const [isProofreadEnabled, setIsProofreadEnabled] = useState(true)
+  const [proofreadPreset, setProofreadPreset] = useState<ProofreadPreset>('standard')
   const [proofreadSystemPrompt, setProofreadSystemPrompt] = useState(DEFAULT_PROOFREAD_SYSTEM_PROMPT)
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_SIDEBAR_WIDTH)
   const [rightInspectorWidth, setRightInspectorWidth] = useState(DEFAULT_RIGHT_INSPECTOR_WIDTH)
@@ -256,6 +286,7 @@ function GraphChatApp() {
       setIsSnapToGridEnabled(uiPreferences.isSnapToGridEnabled)
       setEdgeType(uiPreferences.edgeType)
       setIsProofreadEnabled(uiPreferences.isProofreadEnabled)
+      setProofreadPreset(uiPreferences.proofreadPreset ?? 'standard')
       if (uiPreferences.proofreadSystemPrompt) setProofreadSystemPrompt(uiPreferences.proofreadSystemPrompt)
       setLeftSidebarWidth(uiPreferences.leftSidebarWidth)
       setRightInspectorWidth(Math.max(uiPreferences.rightInspectorWidth, DEFAULT_RIGHT_INSPECTOR_WIDTH))
@@ -288,6 +319,7 @@ function GraphChatApp() {
       isSnapToGridEnabled,
       edgeType,
       isProofreadEnabled,
+      proofreadPreset,
       leftSidebarWidth,
       rightInspectorWidth,
       generalSections,
@@ -300,7 +332,7 @@ function GraphChatApp() {
       contentFontSize
     }
     void window.graphChat.savePreferences(payload)
-  }, [isSidebarOpen, isSettingsPanelOpen, isPropertiesPanelOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, leftSidebarWidth, rightInspectorWidth, generalSections, textStyleTarget, textStylePreset, titleTextStylePreset, contentTextStylePreset, titleFontSize, contentFontSize])
+  }, [isSidebarOpen, isSettingsPanelOpen, isPropertiesPanelOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, proofreadPreset, leftSidebarWidth, rightInspectorWidth, generalSections, textStyleTarget, textStylePreset, titleTextStylePreset, contentTextStylePreset, titleFontSize, contentFontSize])
 
   useEffect(() => {
     setNodes((current) => {
@@ -444,6 +476,9 @@ function GraphChatApp() {
       return changed ? next : current
     })
   }, [selectedNodeIds, editingNodeId])
+
+  const activeProofreadPrompt = proofreadPreset === 'custom' ? (proofreadSystemPrompt.trim() || DEFAULT_PROOFREAD_SYSTEM_PROMPT) : PROOFREAD_PRESETS[proofreadPreset].prompt
+
 
   const selectedNode = useMemo(() => selectedNodeIds.length === 1 ? snapshotRef.current?.nodes.find((node) => node.id === selectedNodeIds[0]) ?? null : null, [selectedNodeIds, nodes])
   const nodeTypes = useMemo(() => ({ graphNode: GraphNodeCard }), [])
@@ -766,11 +801,17 @@ function GraphChatApp() {
     setStatus('Generation stopped')
   }
 
-  function handleProofreadRequest(payload: { nodeId: string; text: string; selectionStart: number; selectionEnd: number; fullContent: string; rect: DOMRect }) {
+  function handleProofreadRequest(payload: ProofreadRequestPayload) {
     if (!isProofreadEnabled || !isModelLoaded) return
     if (proofreadRef.current) {
       void window.graphChat.stopProofread(proofreadRef.current.proofreadId)
     }
+    const popupWidth = 320
+    const popupGap = 12
+    const top = Math.max(16, Math.min(payload.rect.top, window.innerHeight - 220))
+    const left = payload.side === 'left'
+      ? Math.max(16, payload.rect.left - popupWidth - popupGap)
+      : Math.min(window.innerWidth - popupWidth - 16, payload.rect.right + popupGap)
     const proofreadId = crypto.randomUUID()
     setProofread({
       proofreadId,
@@ -781,21 +822,26 @@ function GraphChatApp() {
       selectionStart: payload.selectionStart,
       selectionEnd: payload.selectionEnd,
       fullContent: payload.fullContent,
-      position: { top: payload.rect.top, left: payload.rect.right + 8 }
+      position: { top, left },
+      onApply: payload.onApply
     })
-    void window.graphChat.startProofread(proofreadId, payload.text, proofreadSystemPrompt)
+    void window.graphChat.startProofread(proofreadId, payload.text, activeProofreadPrompt)
   }
 
   function acceptProofread() {
     const p = proofreadRef.current
     if (!p || !p.correctedText) return
-    const snapshot = snapshotRef.current
-    const node = snapshot?.nodes.find((n) => n.id === p.nodeId)
-    if (!node) return
     const newContent = p.fullContent.slice(0, p.selectionStart) + p.correctedText + p.fullContent.slice(p.selectionEnd)
-    const updated = { ...node, content: newContent }
-    mutateLocalNode(updated)
-    void persistNode(updated)
+    if (p.onApply) {
+      p.onApply(newContent)
+    } else {
+      const snapshot = snapshotRef.current
+      const node = snapshot?.nodes.find((n) => n.id === p.nodeId)
+      if (!node) return
+      const updated = { ...node, content: newContent }
+      mutateLocalNode(updated)
+      void persistNode(updated)
+    }
     setProofread(null)
   }
 
@@ -1542,6 +1588,7 @@ function GraphChatApp() {
                 currentModelName={settings?.selectedModelName ?? null}
                 contextLength={settings?.contextLength ?? null}
                 onGenerate={() => void handleGenerate(selectedNode.id)}
+                onProofreadRequest={handleProofreadRequest}
                 onChange={(updated) => {
                   mutateLocalNode(updated)
                   void persistNode(updated)
@@ -1566,6 +1613,7 @@ function GraphChatApp() {
               isSnapToGridEnabled={isSnapToGridEnabled}
               edgeType={edgeType}
               isProofreadEnabled={isProofreadEnabled}
+              proofreadPreset={proofreadPreset}
               textStyleTarget={textStyleTarget}
               textStylePreset={textStylePreset}
               titleTextStylePreset={titleTextStylePreset}
@@ -1606,6 +1654,10 @@ function GraphChatApp() {
                 setContentFontSize(resolved)
               }}
               proofreadSystemPrompt={proofreadSystemPrompt}
+              onChangeProofreadPreset={(value) => {
+                setProofreadPreset(value)
+                void window.graphChat.savePreferences({ proofreadPreset: value })
+              }}
               onSaveProofreadSystemPrompt={(value) => {
                 const resolved = value.trim() === '' ? DEFAULT_PROOFREAD_SYSTEM_PROMPT : value
                 setProofreadSystemPrompt(resolved)
@@ -1855,6 +1907,7 @@ function NodeEditor({
   currentModelName,
   contextLength,
   onGenerate,
+  onProofreadRequest,
   onChange,
   onDuplicate,
   onDelete
@@ -1864,6 +1917,7 @@ function NodeEditor({
   currentModelName: string | null
   contextLength: number | null
   onGenerate: () => void
+  onProofreadRequest: (payload: ProofreadRequestPayload) => void
   onChange: (node: GraphNodeRecord) => void
   onDuplicate: () => void
   onDelete: () => void
@@ -1885,6 +1939,8 @@ function NodeEditor({
   const [draftContent, setDraftContent] = useState(node.content)
   const [draftScope, setDraftScope] = useState(node.isLocal ? 'local' : 'global')
   const contentScrollRef = useRef<HTMLDivElement | null>(null)
+  const detailTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const proofreadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
 
@@ -1907,6 +1963,12 @@ function NodeEditor({
 
     return () => window.cancelAnimationFrame(frame)
   }, [isEditingDetails, node.id, node.content])
+
+  useEffect(() => {
+    return () => {
+      if (proofreadTimerRef.current) clearTimeout(proofreadTimerRef.current)
+    }
+  }, [])
 
   function saveDetails() {
     onChange({
@@ -1938,6 +2000,37 @@ function NodeEditor({
     setShowBottomFade(maxScrollTop > 2 && element.scrollTop < maxScrollTop - 2)
   }
 
+  function handleDetailSelection(event: SyntheticEvent<HTMLTextAreaElement>) {
+    const element = event.currentTarget
+    const selectionStart = element.selectionStart ?? 0
+    const selectionEnd = element.selectionEnd ?? 0
+    const selectedText = element.value.slice(selectionStart, selectionEnd).trim()
+    if (proofreadTimerRef.current) clearTimeout(proofreadTimerRef.current)
+    if (!selectedText || disabled) return
+    proofreadTimerRef.current = setTimeout(() => {
+      const rect = element.getBoundingClientRect()
+      onProofreadRequest({
+        nodeId: node.id,
+        text: selectedText,
+        selectionStart,
+        selectionEnd,
+        fullContent: element.value,
+        rect,
+        side: 'left',
+        onApply: (nextContent) => {
+          setDraftContent(nextContent)
+          window.requestAnimationFrame(() => {
+            const textarea = detailTextareaRef.current
+            if (!textarea) return
+            textarea.focus()
+            textarea.selectionStart = selectionStart
+            textarea.selectionEnd = selectionStart + (nextContent.length - (element.value.length - (selectionEnd - selectionStart)))
+          })
+        }
+      })
+    }, 600)
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-5">
       <div className="mb-4 flex flex-wrap gap-2">
@@ -1952,7 +2045,7 @@ function NodeEditor({
           </label>
           <label className="mb-4 flex min-h-0 flex-1 flex-col">
             <div className="mb-2 text-sm font-medium text-[var(--text-dim)]">Content</div>
-            <textarea value={draftContent} disabled={disabled} onChange={(event) => setDraftContent(event.target.value)} className="inspector-scrollbar min-h-[16rem] flex-1 rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm leading-7 outline-none" />
+            <textarea ref={detailTextareaRef} value={draftContent} disabled={disabled} onChange={(event) => setDraftContent(event.target.value)} onSelect={handleDetailSelection} className="inspector-scrollbar min-h-[16rem] flex-1 rounded-md border border-[var(--border-strong)] bg-[var(--bg-input)] px-4 py-3 text-sm leading-7 outline-none" />
             {estimatedContentTokens !== null && (
               <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
                 <MessageIcon className="h-3.5 w-3.5" />
@@ -2060,6 +2153,7 @@ function GeneralInspector({
   isSnapToGridEnabled,
   edgeType,
   isProofreadEnabled,
+  proofreadPreset,
   textStyleTarget,
   textStylePreset,
   titleTextStylePreset,
@@ -2073,6 +2167,7 @@ function GeneralInspector({
   onToggleSnapToGrid,
   onChangeEdgeType,
   onToggleProofread,
+  onChangeProofreadPreset,
   onChangeTextStyleTarget,
   onChangeTextStylePreset,
   onChangeTextSize,
@@ -2085,6 +2180,7 @@ function GeneralInspector({
   isSnapToGridEnabled: boolean
   edgeType: 'default' | 'smoothstep' | 'step'
   isProofreadEnabled: boolean
+  proofreadPreset: ProofreadPreset
   textStyleTarget: TextStyleTarget
   textStylePreset: TextStylePreset
   titleTextStylePreset: TextStylePreset
@@ -2098,6 +2194,7 @@ function GeneralInspector({
   onToggleSnapToGrid: () => void
   onChangeEdgeType: (value: 'default' | 'smoothstep' | 'step') => void
   onToggleProofread: () => void
+  onChangeProofreadPreset: (value: ProofreadPreset) => void
   onChangeTextStyleTarget: (value: TextStyleTarget) => void
   onChangeTextStylePreset: (value: TextStylePreset) => void
   onChangeTextSize: (target: TextStyleTarget, value: number) => void
@@ -2110,6 +2207,7 @@ function GeneralInspector({
   const [pendingTemperature, setPendingTemperature] = useState(settings?.temperature ?? defaultTemperature)
   const [pendingContextLength, setPendingContextLength] = useState(settings?.contextLength ?? defaultContextLength)
   const [draftSystemPrompt, setDraftSystemPrompt] = useState(proofreadSystemPrompt)
+  const selectedProofreadPreset = proofreadPreset === 'custom' ? null : PROOFREAD_PRESETS[proofreadPreset]
   const activeTextSize = getActiveTextSize(textStyleTarget, titleFontSize, contentFontSize)
   const activeTextPreset = getActiveTextPreset(textStyleTarget, titleTextStylePreset, contentTextStylePreset)
   const selectedTextStyle = TEXT_STYLE_PRESETS[activeTextPreset]
@@ -2276,7 +2374,7 @@ function GeneralInspector({
 
       <InspectorSection
         title="Text Style"
-        icon={<EditIcon className="h-[15px] w-[15px]" />}
+        icon={<TypeIcon className="h-[15px] w-[15px]" />}
         open={sections.textStyle}
         onToggle={() => onToggleSection('textStyle')}
       >
@@ -2331,9 +2429,9 @@ function GeneralInspector({
         <p className="mt-2 text-[11px] leading-5 text-[var(--text-faint)]">{isTextPresetMixed ? 'Title and text currently use different presets. Choosing Both will align them.' : isTextSizeMixed ? 'Title and text currently use different sizes. Choosing Both will align them.' : 'These settings are auto-saved and restored on the next launch.'}</p>
       </InspectorSection>
 
-      <InspectorSection
+            <InspectorSection
         title="Editing"
-        icon={<EditIcon className="h-[15px] w-[15px]" />}
+        icon={<SparkIcon className="h-[15px] w-[15px]" />}
         open={sections.editing}
         onToggle={() => onToggleSection('editing')}
       >
@@ -2349,23 +2447,41 @@ function GeneralInspector({
             <span className={`absolute top-[2px] h-[12px] w-[12px] rounded-full transition ${isProofreadEnabled ? 'left-[14px] bg-white' : 'left-[2px] bg-[rgba(255,255,255,0.35)]'}`} />
           </button>
         </div>
-        <div className="mt-3 flex flex-col gap-2">
-          <span className="text-[13px] text-[var(--text-dim)]">System Prompt</span>
-          <textarea
-            value={draftSystemPrompt}
-            onChange={(e) => setDraftSystemPrompt(e.target.value)}
-            rows={5}
-            className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent-border)]"
-          />
-          <button
-            type="button"
-            disabled={!isSystemPromptChanged}
-            onClick={() => onSaveProofreadSystemPrompt(draftSystemPrompt)}
-            className="self-end rounded-md border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-3 py-1 text-[12px] text-[var(--text-dim)] transition hover:bg-white/5 hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-[13px] text-[var(--text-dim)]">Preset</span>
+          <select
+            value={proofreadPreset}
+            onChange={(event) => onChangeProofreadPreset(event.target.value as ProofreadPreset)}
+            className="rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-input)] px-2 py-0.5 text-[12px] text-[var(--text)] outline-none"
           >
-            Save
-          </button>
+            <option value="light">Light</option>
+            <option value="standard">Standard</option>
+            <option value="aggressive">Aggressive</option>
+            <option value="custom">Custom</option>
+          </select>
         </div>
+        <p className="mt-3 text-[11px] leading-5 text-[var(--text-faint)]">
+          {selectedProofreadPreset ? selectedProofreadPreset.description : 'Use your own custom system prompt.'}
+        </p>
+        {proofreadPreset === 'custom' && (
+          <div className="mt-3 flex flex-col gap-2">
+            <span className="text-[13px] text-[var(--text-dim)]">System Prompt</span>
+            <textarea
+              value={draftSystemPrompt}
+              onChange={(e) => setDraftSystemPrompt(e.target.value)}
+              rows={5}
+              className="w-full resize-y rounded-md border border-[var(--border)] bg-[var(--bg-input)] px-3 py-2 text-[12px] text-[var(--text)] outline-none focus:border-[var(--accent-border)]"
+            />
+            <button
+              type="button"
+              disabled={!isSystemPromptChanged}
+              onClick={() => onSaveProofreadSystemPrompt(draftSystemPrompt)}
+              className="self-end rounded-md border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] px-3 py-1 text-[12px] text-[var(--text-dim)] transition hover:bg-white/5 hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Save
+            </button>
+          </div>
+        )}
       </InspectorSection>
     </div>
   )
@@ -2625,6 +2741,27 @@ function EditIcon({ className }: { className?: string }) {
   )
 }
 
+function TypeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M4 6h16" />
+      <path d="M10 6v12" />
+      <path d="M14 6v12" />
+      <path d="M7 18h10" />
+    </svg>
+  )
+}
+
+function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="m12 3 1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3L12 3Z" />
+      <path d="m18.5 13 0.8 2.2 2.2 0.8-2.2 0.8-0.8 2.2-0.8-2.2-2.2-0.8 2.2-0.8 0.8-2.2Z" />
+      <path d="m6 14 1 2.7L9.7 18 7 19l-1 2.7L5 19l-2.7-1L5 16.7 6 14Z" />
+    </svg>
+  )
+}
+
 function GearIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -2868,7 +3005,3 @@ function edgeStyleForHandle(handle: TextInputHandle | null) {
 }
 
 export default App
-
-
-
-
