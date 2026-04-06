@@ -2328,7 +2328,7 @@ function displayModelName(modelName: string): string {
 function getMiniMapNodeColor(node: Node<AppNodeData>): string {
   const graphNode = node.data?.graphNode
   const type = graphNode?.type
-  if (type === 'context') return graphNode?.isLocal ? '#44507a' : '#3a315f'
+  if (type === 'context') return graphNode?.isLocal ? '#2e4f82' : '#1e3a6b'
   if (type === 'instruction') return graphNode?.isLocal ? '#6c3d63' : '#5b2d5d'
   return '#3f4150'
 }
