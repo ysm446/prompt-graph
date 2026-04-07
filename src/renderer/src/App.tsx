@@ -2602,7 +2602,7 @@ function GeneralInspector({
 
             <InspectorSection
         title="Editing"
-        icon={<SparkIcon className="h-[15px] w-[15px]" />}
+        icon={<EditIcon className="h-[15px] w-[15px]" />}
         open={sections.editing}
         onToggle={() => onToggleSection('editing')}
       >
@@ -2657,7 +2657,7 @@ function GeneralInspector({
 
       <InspectorSection
         title="Debug"
-        icon={<span className="text-[11px] font-mono font-bold leading-none">{'{ }'}</span>}
+        icon={<AlertCircleIcon className="h-[15px] w-[15px]" />}
         open={sections.debug}
         onToggle={() => onToggleSection('debug')}
       >
@@ -2964,23 +2964,22 @@ function EditIcon({ className }: { className?: string }) {
 function TypeIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="M4 6h16" />
-      <path d="M10 6v12" />
-      <path d="M14 6v12" />
-      <path d="M7 18h10" />
+      <path d="M4 5h16" />
+      <path d="M12 5v14" />
     </svg>
   )
 }
 
-function SparkIcon({ className }: { className?: string }) {
+function AlertCircleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d="m12 3 1.3 3.7L17 8l-3.7 1.3L12 13l-1.3-3.7L7 8l3.7-1.3L12 3Z" />
-      <path d="m18.5 13 0.8 2.2 2.2 0.8-2.2 0.8-0.8 2.2-0.8-2.2-2.2-0.8 2.2-0.8 0.8-2.2Z" />
-      <path d="m6 14 1 2.7L9.7 18 7 19l-1 2.7L5 19l-2.7-1L5 16.7 6 14Z" />
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
     </svg>
   )
 }
+
 
 function GearIcon({ className }: { className?: string }) {
   return (
