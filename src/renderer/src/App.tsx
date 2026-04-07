@@ -273,6 +273,7 @@ function GraphChatApp() {
   const activeProjectIdRef = useRef(activeProjectId)
   const generationRef = useRef(generation)
   const generationQueueRef = useRef(generationQueue)
+  const handleGenerateRef = useRef<(nodeId: string) => Promise<void>>(async () => {})
   const copiedSelectionRef = useRef<CopiedSelection | null>(null)
   const hasLoadedPreferencesRef = useRef(false)
   const resizeStateRef = useRef<{ side: ResizeSide; startX: number; startWidth: number } | null>(null)
@@ -388,7 +389,7 @@ function GraphChatApp() {
       const next = generationQueueRef.current[0]
       if (next) {
         setGenerationQueue((current) => current.slice(1))
-        void handleGenerate(next)
+        void handleGenerateRef.current(next)
         setStatus('Generation completed — starting next...')
       } else {
         setStatus('Generation completed')
@@ -401,7 +402,7 @@ function GraphChatApp() {
       const next = generationQueueRef.current[0]
       if (next) {
         setGenerationQueue((current) => current.slice(1))
-        void handleGenerate(next)
+        void handleGenerateRef.current(next)
       }
       setError(message)
       setStatus('Generation failed')
@@ -801,6 +802,8 @@ function GraphChatApp() {
       setError(err instanceof Error ? err.message : String(err))
     }
   }
+
+  handleGenerateRef.current = handleGenerate
 
   function handleGenerateDownstream(nodeId: string) {
     const snapshot = snapshotRef.current
