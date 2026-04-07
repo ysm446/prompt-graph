@@ -28,7 +28,7 @@ src/
 - `GraphNodeRecord`: node with position, size, content, generationMeta
 - `GraphEdgeRecord`: edge connecting sourceHandle → targetHandle
 - `AppSettings`: llama-server config (model path, context length, temperature)
-- `UiPreferences`: sidebar widths, panel visibility, snap-to-grid, edge type, proofread toggle, section open/close state
+- `UiPreferences`: sidebar widths, panel visibility, snap-to-grid, edge type, proofread toggle, section open/close state, per-project viewport (`projectViewports`)
 
 ### Node handles
 
@@ -44,6 +44,8 @@ All nodes have one output handle on the right.
 - SQLite database managed by `database.ts`
 - Projects contain nodes and edges; full snapshots loaded on project switch
 - UI preferences persisted separately via Electron IPC
+- Both `graph-chat.db` and `preferences.json` are stored in `data/` at the project root (gitignored)
+- Per-project camera position and zoom are saved in `UiPreferences.projectViewports` and restored on project switch
 
 ### LLM backend
 

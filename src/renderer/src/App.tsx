@@ -19,7 +19,8 @@ import {
   type Edge,
   type Node,
   type OnEdgesChange,
-  type OnNodesChange
+  type OnNodesChange,
+  type Viewport
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeType, ProjectRecord, ProjectSnapshot, ProofreadPreset, TextInputHandle, TextStylePreset, TextStyleTarget, UiPreferences } from '../../main/types'
@@ -270,6 +271,7 @@ function GraphChatApp() {
   const copiedSelectionRef = useRef<CopiedSelection | null>(null)
   const hasLoadedPreferencesRef = useRef(false)
   const resizeStateRef = useRef<{ side: ResizeSide; startX: number; startWidth: number } | null>(null)
+  const projectViewportsRef = useRef<Record<string, Viewport>>({})
 
   activeProjectIdRef.current = activeProjectId
   generationRef.current = generation
@@ -298,6 +300,7 @@ function GraphChatApp() {
       setContentTextStylePreset(uiPreferences.contentTextStylePreset)
       setTitleFontSize(uiPreferences.titleFontSize)
       setContentFontSize(uiPreferences.contentFontSize)
+      projectViewportsRef.current = uiPreferences.projectViewports ?? {}
       setActiveProjectId(snapshot.project.id)
       applySnapshot(snapshot)
       setIsProjectDirty(false)
@@ -308,6 +311,12 @@ function GraphChatApp() {
       setStatus('Failed to load')
     })
   }, [])
+
+  useEffect(() => {
+    if (!activeProjectId) return
+    const saved = projectViewportsRef.current[activeProjectId]
+    if (saved) reactFlow.setViewport(saved)
+  }, [activeProjectId])
 
   useEffect(() => {
     if (!hasLoadedPreferencesRef.current) return
@@ -1102,6 +1111,12 @@ function GraphChatApp() {
     }
   }
 
+  function handleMoveEnd(_event: MouseEvent | TouchEvent | null, viewport: Viewport) {
+    if (!activeProjectIdRef.current) return
+    projectViewportsRef.current = { ...projectViewportsRef.current, [activeProjectIdRef.current]: viewport }
+    void window.graphChat.savePreferences({ projectViewports: projectViewportsRef.current })
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (proofreadRef.current) {
@@ -1569,6 +1584,7 @@ function GraphChatApp() {
             void removeEdge(edge.id)
           }}
           defaultEdgeOptions={defaultEdgeOptions}
+          onMoveEnd={handleMoveEnd}
         >
           {isMiniMapVisible && <MiniMap pannable zoomable nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
           <Background gap={GRID_SIZE} size={1.4} color="#394154" />

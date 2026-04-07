@@ -12,7 +12,6 @@ const proofreadControllers = new Map<string, AbortController>()
 let repository: GraphRepository | null = null
 let llamaServer: LlamaServerManager | null = null
 let preferencesPath = ''
-const APP_USER_DATA_NAME = 'graph-chat'
 const defaultUiPreferences: UiPreferences = {
   contextLength: 32768,
   temperature: 0.8,
@@ -40,9 +39,10 @@ const defaultUiPreferences: UiPreferences = {
     interface: true,
     textStyle: true,
     editing: true
-  }
+  },
+  projectViewports: {}
 }
-let uiPreferencesCache: UiPreferences = { ...defaultUiPreferences, generalSections: { ...defaultUiPreferences.generalSections } }
+let uiPreferencesCache: UiPreferences = { ...defaultUiPreferences, generalSections: { ...defaultUiPreferences.generalSections }, projectViewports: {} }
 let hasUnsavedChanges = false
 
 function getRepository(): GraphRepository {
@@ -113,7 +113,7 @@ function resolveIconPath(): string | undefined {
 }
 
 app.whenReady().then(() => {
-  app.setPath('userData', join(app.getPath('appData'), APP_USER_DATA_NAME))
+  app.setPath('userData', join(process.cwd(), 'data'))
   repository = new GraphRepository()
   llamaServer = new LlamaServerManager()
   preferencesPath = join(app.getPath('userData'), 'preferences.json')
@@ -634,6 +634,7 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
       interface: input.generalSections?.interface ?? defaultUiPreferences.generalSections.interface,
       textStyle: input.generalSections?.textStyle ?? defaultUiPreferences.generalSections.textStyle,
       editing: input.generalSections?.editing ?? defaultUiPreferences.generalSections.editing
-    }
+    },
+    projectViewports: input.projectViewports ?? defaultUiPreferences.projectViewports
   }
 }

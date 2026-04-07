@@ -18,6 +18,9 @@ bin/
 models/
 !models/.gitkeep
 
+# User data (database and preferences)
+data/
+
 # Logs
 *.log
 npm-debug.log*

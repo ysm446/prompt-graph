@@ -105,6 +105,7 @@ export interface UiPreferences {
     textStyle: boolean
     editing: boolean
   }
+  projectViewports: Record<string, { x: number; y: number; zoom: number }>
 }
 
 
