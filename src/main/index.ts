@@ -5,7 +5,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { GraphRepository } from './database'
 import { LlamaServerManager } from './llamaServer'
-import type { GraphEdgeRecord, GraphNodeRecord, NodeType, ProjectSnapshot, TextInputHandle, UiPreferences } from './types'
+import type { GraphEdgeRecord, GraphNodeRecord, ImageAsset, NodeInputHandle, NodeType, ProjectSnapshot, UiPreferences } from './types'
 
 const generationControllers = new Map<string, AbortController>()
 const proofreadControllers = new Map<string, AbortController>()
@@ -195,6 +195,18 @@ function registerIpc(): void {
     const node = repository.createNode(input)
     return { node, snapshot: repository.getProjectSnapshot(node.projectId), projects: repository.listProjects() }
   })
+  ipcMain.handle('node:createImage', async (_event, input: { projectId: string; position?: { x: number; y: number } }) => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Image',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }
+      ]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true as const }
+    const node = repository.importImageNode({ projectId: input.projectId, sourcePath: result.filePaths[0], position: input.position })
+    return { canceled: false as const, node, snapshot: repository.getProjectSnapshot(node.projectId), projects: repository.listProjects() }
+  })
   ipcMain.handle('node:update', async (_event, input) => repository.updateNode(input))
   ipcMain.handle('node:delete', async (_event, id: string) => {
     const node = repository.getNode(id)
@@ -283,26 +295,30 @@ async function streamGeneration(input: {
     const llamaServer = getLlamaServer()
     await llamaServer.ensureRunning()
     const userMessage = input.userContext + '\n\n---\nWrite the target text based on the context above.'
+    const activeSettings = llamaServer.getSettings()
+    const userContent = await buildGenerationUserContent(userMessage, input.snapshot, input.targetNode.id, activeSettings.supportsVision)
     if (uiPreferencesCache.isPromptLogEnabled) {
       input.event.sender.send('debug:promptLog', {
         generationId: input.generationId,
         nodeId: input.targetNode.id,
         nodeTitle: input.targetNode.title || '(untitled)',
         systemPrompt: input.systemPrompt,
-        userMessage
+        userMessage,
+        imageCount: Array.isArray(userContent) ? Math.max(userContent.length - 1, 0) : 0,
+        supportsVision: activeSettings.supportsVision
       })
     }
-    const response = await fetch(`${llamaServer.getSettings().llamaBaseUrl}/v1/chat/completions`, {
+    const response = await fetch(`${activeSettings.llamaBaseUrl}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: llamaServer.getSettings().llamaModelAlias,
+        model: activeSettings.llamaModelAlias,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: llamaServer.getSettings().temperature,
+        temperature: activeSettings.temperature,
         messages: [
           { role: 'system', content: input.systemPrompt },
-          { role: 'user', content: userMessage }
+          { role: 'user', content: userContent }
         ]
       }),
       signal: input.signal
@@ -424,6 +440,7 @@ function collectContext(nodeId: string, nodes: GraphNodeRecord[], edges: GraphEd
   const directTextParents = getHandleParents(nodeId, 'text', edges, nodeMap)
   const directContextParents = getHandleParents(nodeId, 'context', edges, nodeMap)
   const directInstructionParents = getHandleParents(nodeId, 'instruction', edges, nodeMap)
+  const directImageParents = getHandleParents(nodeId, 'image', edges, nodeMap)
   const upstreamTexts = collectUpstreamTextNodes(directTextParents, edges, nodeMap)
 
   // Collect global instructions/contexts from upstream text nodes
@@ -468,6 +485,12 @@ ${node.content.trim()}`)
   ].filter((node) => node.content.trim())
     .map((node, index) => `# ${node.isLocal ? 'Local Context' : 'Context'} ${index + 1}${node.title ? `: ${node.title}` : ''}
 ${node.content.trim()}`)
+  const imageParts = directImageParents.map((node, index) => {
+    const imageInfo = node.image
+    const fileLabel = imageInfo?.originalName ? ` (file: ${imageInfo.originalName})` : ''
+    const sizeLabel = imageInfo?.width && imageInfo?.height ? `, ${imageInfo.width} x ${imageInfo.height}` : ''
+    return `# Image ${index + 1}${node.title ? `: ${node.title}` : ''}${fileLabel}${sizeLabel}`
+  })
   const targetInfo = self
     ? `# Target Node${self.title ? `: ${self.title}` : ''}
 Write the final content for this target node.`
@@ -475,14 +498,59 @@ Write the final content for this target node.`
 Write the final content for this target node.`
 
   return {
-    systemPrompt: [...globalInstructionParts, ...localInstructionParts].join('\\n\\n') || 'You are a helpful writing assistant.',
+    systemPrompt: [...globalInstructionParts, ...localInstructionParts].join('\n\n') || 'You are a helpful writing assistant.',
     userContext: [
       ...contextParts,
+      ...imageParts,
       ...[...upstreamTextParts].reverse(),
       ...directParentTexts,
       targetInfo
-    ].filter(Boolean).join('\n\n') || self?.title || 'Write the final content for the target node.'
+    ].filter(Boolean).join('\\n\\n') || self?.title || 'Write the final content for the target node.',
+    images: directImageParents.map((node) => node.image).filter((image): image is ImageAsset => Boolean(image))
   }
+}
+
+async function buildGenerationUserContent(
+  userMessage: string,
+  snapshot: ProjectSnapshot,
+  targetNodeId: string,
+  supportsVision: boolean
+): Promise<string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>> {
+  if (!supportsVision) return userMessage
+  const { images } = collectContext(targetNodeId, snapshot.nodes, snapshot.edges)
+  if (images.length === 0) return userMessage
+
+  const imageParts: Array<{ type: 'image_url'; image_url: { url: string } }> = []
+  for (const image of images) {
+    const dataUrl = await imageAssetToDataUrl(image)
+    if (!dataUrl) continue
+    imageParts.push({ type: 'image_url', image_url: { url: dataUrl } })
+  }
+
+  if (imageParts.length === 0) return userMessage
+  return [{ type: 'text', text: userMessage }, ...imageParts]
+}
+
+async function imageAssetToDataUrl(image: ImageAsset): Promise<string | null> {
+  if (image.thumbnailDataUrl) return image.thumbnailDataUrl
+  const filePath = image.thumbnailPath ?? image.path
+  try {
+    const buffer = await readFile(filePath)
+    const mimeType = image.mimeType ?? guessMimeTypeFromPath(filePath)
+    return `data:${mimeType};base64,${buffer.toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
+function guessMimeTypeFromPath(filePath: string): string {
+  const normalized = filePath.toLowerCase()
+  if (normalized.endsWith('.png')) return 'image/png'
+  if (normalized.endsWith('.jpg') || normalized.endsWith('.jpeg')) return 'image/jpeg'
+  if (normalized.endsWith('.gif')) return 'image/gif'
+  if (normalized.endsWith('.webp')) return 'image/webp'
+  if (normalized.endsWith('.bmp')) return 'image/bmp'
+  return 'application/octet-stream'
 }
 
 async function streamProofread(input: { event: Electron.IpcMainInvokeEvent; proofreadId: string; text: string; systemPrompt: string; signal: AbortSignal }): Promise<void> {
@@ -545,7 +613,7 @@ function stripThinkTags(content: string): string {
 }
 function getHandleParents(
   targetId: string,
-  handle: TextInputHandle,
+  handle: NodeInputHandle,
   edges: GraphEdgeRecord[],
   nodeMap: Map<string, GraphNodeRecord>
 ): GraphNodeRecord[] {
@@ -590,15 +658,16 @@ function traverseTextParents(
   return results
 }
 
-function resolveTargetHandle(edge: GraphEdgeRecord, nodeMap: Map<string, GraphNodeRecord>): TextInputHandle | null {
+function resolveTargetHandle(edge: GraphEdgeRecord, nodeMap: Map<string, GraphNodeRecord>): NodeInputHandle | null {
   if (edge.targetHandle) return edge.targetHandle
   const sourceType = nodeMap.get(edge.sourceId)?.type
   return sourceType ? defaultTargetHandleForNodeType(sourceType) : null
 }
 
-function defaultTargetHandleForNodeType(type: NodeType): TextInputHandle | null {
+function defaultTargetHandleForNodeType(type: NodeType): NodeInputHandle | null {
   if (type === 'text') return 'text'
   if (type === 'context') return 'context'
+  if (type === 'image') return 'image'
   return 'instruction'
 }
 

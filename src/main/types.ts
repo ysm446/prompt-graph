@@ -1,9 +1,19 @@
-export type NodeType = 'text' | 'context' | 'instruction'
-export type TextInputHandle = 'text' | 'context' | 'instruction'
+export type NodeType = 'text' | 'context' | 'instruction' | 'image'
+export type NodeInputHandle = 'text' | 'context' | 'instruction' | 'image'
 export type NodeOutputHandle = 'output'
 export type TextStyleTarget = 'both' | 'title' | 'content'
 export type TextStylePreset = 'standard' | 'business' | 'reading' | 'dense'
 export type ProofreadPreset = 'light' | 'standard' | 'aggressive' | 'custom'
+
+export interface ImageAsset {
+  path: string
+  thumbnailPath: string | null
+  thumbnailDataUrl: string | null
+  originalName: string
+  mimeType: string | null
+  width: number | null
+  height: number | null
+}
 
 export interface ProjectRecord {
   id: string
@@ -32,6 +42,7 @@ export interface GraphNodeRecord {
   model: string | null
   isGenerated: boolean
   generationMeta: GenerationMeta | null
+  image: ImageAsset | null
   createdAt: string
   updatedAt: string
   position: {
@@ -50,7 +61,7 @@ export interface GraphEdgeRecord {
   sourceId: string
   targetId: string
   sourceHandle: NodeOutputHandle | null
-  targetHandle: TextInputHandle | null
+  targetHandle: NodeInputHandle | null
 }
 
 export interface ProjectSnapshot {
@@ -74,7 +85,9 @@ export interface AppSettings {
   temperature: number
   availableModels: ModelOption[]
   resolvedModelPath: string
+  resolvedMmprojPath: string | null
   resolvedServerPath: string
+  supportsVision: boolean
 }
 
 export interface UiPreferences {

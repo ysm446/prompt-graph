@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { accessSync, constants, existsSync, readdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:net'
-import { basename, join, relative, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { app } from 'electron'
 import type { AppSettings, ModelOption } from './types'
@@ -116,8 +116,14 @@ export class LlamaServerManager {
     await waitForProcessExit(proc, 2_000)
   }
 
-  private buildSettings(selectedModel: ModelOption, availableModels = this.listModels(), contextLength = this.settings?.contextLength ?? DEFAULT_CONTEXT_LENGTH, temperature = this.settings?.temperature ?? DEFAULT_TEMPERATURE): AppSettings {
+  private buildSettings(
+    selectedModel: ModelOption,
+    availableModels = this.listModels(),
+    contextLength = this.settings?.contextLength ?? DEFAULT_CONTEXT_LENGTH,
+    temperature = this.settings?.temperature ?? DEFAULT_TEMPERATURE
+  ): AppSettings {
     accessSync(this.serverPath, constants.F_OK)
+    const resolvedMmprojPath = findMmprojForModel(selectedModel.path)
     return {
       llamaBaseUrl: `http://127.0.0.1:${this.port}`,
       llamaModelAlias: toModelAlias(selectedModel.name),
@@ -127,41 +133,44 @@ export class LlamaServerManager {
       temperature,
       availableModels,
       resolvedModelPath: selectedModel.path,
-      resolvedServerPath: this.serverPath
+      resolvedMmprojPath,
+      resolvedServerPath: this.serverPath,
+      supportsVision: Boolean(resolvedMmprojPath)
     }
   }
 
   private start(): void {
-    const { resolvedServerPath, resolvedModelPath, llamaModelAlias } = this.settings
-    this.process = spawn(
-      resolvedServerPath,
-      [
-        '--host',
-        '127.0.0.1',
-        '--port',
-        String(this.port),
-        '--model',
-        resolvedModelPath,
-        '--alias',
-        llamaModelAlias,
-        '--ctx-size',
-        String(this.settings.contextLength),
-        '--flash-attn',
-        'on',
-        '--reasoning',
-        'off',
-        '--reasoning-format',
-        'none',
-        '--chat-template-kwargs',
-        '{"thinking":false}',
-        '--n-gpu-layers',
-        '999'
-      ],
-      {
-        cwd: join(resolvedServerPath, '..'),
-        windowsHide: true
-      }
-    )
+    const { resolvedServerPath, resolvedModelPath, resolvedMmprojPath, llamaModelAlias } = this.settings
+    const args = [
+      '--host',
+      '127.0.0.1',
+      '--port',
+      String(this.port),
+      '--model',
+      resolvedModelPath,
+      '--alias',
+      llamaModelAlias,
+      '--ctx-size',
+      String(this.settings.contextLength),
+      '--flash-attn',
+      'on',
+      '--reasoning',
+      'off',
+      '--reasoning-format',
+      'none',
+      '--chat-template-kwargs',
+      '{"thinking":false}',
+      '--n-gpu-layers',
+      '999'
+    ]
+    if (resolvedMmprojPath) {
+      args.push('--mmproj', resolvedMmprojPath)
+    }
+
+    this.process = spawn(resolvedServerPath, args, {
+      cwd: join(resolvedServerPath, '..'),
+      windowsHide: true
+    })
     this.process.stdout.on('data', (data) => process.stdout.write(`[llama-server] ${data}`))
     this.process.stderr.on('data', (data) => process.stderr.write(`[llama-server] ${data}`))
     this.process.on('exit', () => {
@@ -245,6 +254,16 @@ function toModelAlias(modelName: string): string {
   return basename(modelName, '.gguf').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'local-model'
 }
 
+function findMmprojForModel(modelPath: string): string | null {
+  const modelDir = dirname(modelPath)
+  if (!existsSync(modelDir)) return null
+  const mmprojFiles = walkFiles(modelDir)
+    .filter((file) => file.toLowerCase().endsWith('.gguf'))
+    .filter((file) => /mmproj/i.test(basename(file)))
+    .sort((left, right) => basename(left).localeCompare(basename(right)))
+  return mmprojFiles[0] ?? null
+}
+
 function walkFiles(dir: string): string[] {
   const entries = readdirSync(dir, { withFileTypes: true })
   const files: string[] = []
@@ -258,7 +277,6 @@ function walkFiles(dir: string): string[] {
   }
   return files
 }
-
 
 function resolveAppRoot(): string {
   const candidates = [

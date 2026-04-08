@@ -23,7 +23,7 @@ import {
   type Viewport
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeType, ProjectRecord, ProjectSnapshot, ProofreadPreset, TextInputHandle, TextStylePreset, TextStyleTarget, UiPreferences } from '../../main/types'
+import type { AppSettings, GraphEdgeRecord, GraphNodeRecord, ModelOption, NodeInputHandle, NodeType, ProjectRecord, ProjectSnapshot, ProofreadPreset, TextStylePreset, TextStyleTarget, UiPreferences } from '../../main/types'
 
 type AppNodeData = {
   graphNode: GraphNodeRecord
@@ -196,6 +196,23 @@ function getNodePreview(content: string, maxChars = 260): string {
   if (normalized.length <= maxChars) return normalized
   return `${normalized.slice(0, maxChars).trimEnd()}...`
 }
+
+function getImageAssetUrl(path: string | null | undefined): string | null {
+  if (!path) return null
+  return window.graphChat.toImageDataUrl(path)
+}
+
+function getImagePreviewUrl(node: GraphNodeRecord): string | null {
+  if (!node.image) return null
+  if (node.image.thumbnailDataUrl) return node.image.thumbnailDataUrl
+  return getImageAssetUrl(node.image.thumbnailPath ?? node.image.path)
+}
+
+function formatImageDimensions(width: number | null | undefined, height: number | null | undefined): string | null {
+  if (!width || !height) return null
+  return `${width} x ${height}`
+}
+
 
 type SelectionProofreadAction = {
   payload: ProofreadRequestPayload
@@ -387,8 +404,8 @@ function GraphChatApp() {
         ...edge,
         selected: edge.id === selectedEdgeId,
         style: edge.id === selectedEdgeId
-          ? selectedEdgeStyleForHandle((edge.targetHandle as TextInputHandle | null) ?? null)
-          : edgeStyleForHandle((edge.targetHandle as TextInputHandle | null) ?? null)
+          ? selectedEdgeStyleForHandle((edge.targetHandle as NodeInputHandle | null) ?? null)
+          : edgeStyleForHandle((edge.targetHandle as NodeInputHandle | null) ?? null)
       }))
     )
   }, [selectedEdgeId])
@@ -610,7 +627,7 @@ function GraphChatApp() {
       targetHandle: edge.targetHandle,
       zIndex: 0,
       animated: false,
-      style: edgeStyleForHandle((edge.targetHandle as TextInputHandle | null) ?? null)
+      style: edgeStyleForHandle((edge.targetHandle as NodeInputHandle | null) ?? null)
     })))
     setSelectedNodeIds((current) => current.filter((id) => normalizedSnapshot.nodes.some((node) => node.id === id)))
     setSelectedEdgeId((current) => normalizedSnapshot.edges.some((edge) => edge.id === current) ? current : null)
@@ -701,6 +718,7 @@ function GraphChatApp() {
       model: null,
       isGenerated: false,
       generationMeta: null,
+      image: null,
       createdAt: now,
       updatedAt: now,
       position: position ? base : normalizePosition({ x: base.x + 40, y: base.y + 160 }, isSnapToGridEnabled),
@@ -715,6 +733,36 @@ function GraphChatApp() {
     setStatus(`${defaultTitle(type)} node created`)
   }
 
+
+  async function addImageNode(position?: { x: number; y: number }) {
+    const snapshot = snapshotRef.current
+    if (!activeProjectId || !snapshot) return
+    const base = normalizePosition(position ?? (selectedNode?.position ?? { x: 120, y: 120 }), isSnapToGridEnabled)
+    const importPosition = position ? base : normalizePosition({ x: base.x + 40, y: base.y + 160 }, isSnapToGridEnabled)
+    let latestSnapshot = snapshot
+    if (isProjectDirty) {
+      const saved = await window.graphChat.saveProjectSnapshot(snapshot)
+      setProjects(saved.projects)
+      applySnapshot(saved.snapshot)
+      setIsProjectDirty(false)
+      latestSnapshot = saved.snapshot
+    }
+    const result = await window.graphChat.createImageNode({ projectId: activeProjectId, position: importPosition })
+    if (result.canceled) {
+      if (latestSnapshot !== snapshot) {
+        setStatus(`Saved ${latestSnapshot.project.name}`)
+      }
+      return
+    }
+    setProjects(result.projects)
+    applySnapshot(result.snapshot)
+    setIsProjectDirty(true)
+    selectNode(result.node.id)
+    setSelectedEdge(null)
+    setCanvasMenu(null)
+    setNodeMenu(null)
+    setStatus('Image node created')
+  }
   async function persistNode(node: GraphNodeRecord) {
     const updated = { ...node, updatedAt: new Date().toISOString() }
     mutateLocalNode(updated)
@@ -768,7 +816,7 @@ function GraphChatApp() {
       }
       const sourceNode = snapshot.nodes.find((node) => node.id === connection.source)
       const targetNode = snapshot.nodes.find((node) => node.id === connection.target)
-      const targetHandle = (connection.targetHandle as TextInputHandle | null) ?? (sourceNode ? defaultTargetHandleForNodeType(sourceNode.type) : null)
+      const targetHandle = (connection.targetHandle as NodeInputHandle | null) ?? (sourceNode ? defaultTargetHandleForNodeType(sourceNode.type) : null)
       if (!sourceNode || !targetNode) {
         throw new Error('Source or target node was not found.')
       }
@@ -1458,6 +1506,7 @@ function GraphChatApp() {
             <MenuAction label="Add Text" onClick={() => void addNode('text', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Context" onClick={() => void addNode('context', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
             <MenuAction label="Add Instruction" onClick={() => void addNode('instruction', { x: canvasMenu.flowX, y: canvasMenu.flowY })} />
+            <MenuAction label="Add Image" onClick={() => void addImageNode({ x: canvasMenu.flowX, y: canvasMenu.flowY })} />
           </div>
         )}
         {nodeMenu && nodeMenuNode && (
@@ -1779,17 +1828,21 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const FADE_START = 0.65
   const FADE_END = 0.5
   const externalTitleOpacity = zoom >= FADE_START ? 0 : zoom <= FADE_END ? 1 : (FADE_START - zoom) / (FADE_START - FADE_END)
-  const borderStyle = node.type === 'text' || !node.isLocal ? 'border-solid' : 'border-dashed'
+  const borderStyle = node.type === 'text' || node.type === 'image' || !node.isLocal ? 'border-solid' : 'border-dashed'
   const colors = {
     text: 'border-[#6b7280] bg-[var(--bg-card)]',
     context: 'border-[rgb(90,100,210)] bg-[var(--bg-card)]',
-    instruction: 'border-[rgb(156,76,196)] bg-[var(--bg-card)]'
+    instruction: 'border-[rgb(156,76,196)] bg-[var(--bg-card)]',
+    image: 'border-[#4d9fc3] bg-[var(--bg-card)]'
   } as const
   const outputHandleColors = {
     text: '!border-[var(--text-faint)] !bg-[var(--text)]',
     context: '!border-[rgb(111,126,255)] !bg-[rgb(111,126,255)]',
-    instruction: '!border-[rgb(201,108,210)] !bg-[rgb(201,108,210)]'
+    instruction: '!border-[rgb(201,108,210)] !bg-[rgb(201,108,210)]',
+    image: '!border-[#63b4d8] !bg-[#63b4d8]' 
   } as const
+  const imagePreviewUrl = getImagePreviewUrl(node)
+  const imageDimensions = formatImageDimensions(node.image?.width, node.image?.height)
 
   useEffect(() => {
     if (node.id !== data.graphNode.id) return
@@ -1855,19 +1908,21 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
       </NodeResizeControl>
       {node.type === 'text' && (
         <>
-          <Handle id="text" type="target" position={Position.Left} style={{ top: '28%' }} className="!h-5 !w-5 !border-2 !border-[var(--text-faint)] !bg-[var(--text)]" />
-          <Handle id="context" type="target" position={Position.Left} style={{ top: '50%' }} className="!h-5 !w-5 !border-2 !border-[rgb(111,126,255)] !bg-[rgb(111,126,255)]" />
-          <Handle id="instruction" type="target" position={Position.Left} style={{ top: '72%' }} className="!h-5 !w-5 !border-2 !border-[rgb(201,108,210)] !bg-[rgb(201,108,210)]" />
-          <div className="pointer-events-none absolute -left-6 top-[22%] text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--text-dim)]">T</div>
-          <div className="pointer-events-none absolute -left-6 top-[44%] text-[10px] font-medium uppercase tracking-[0.2em] text-[rgb(162,170,255)]">C</div>
-          <div className="pointer-events-none absolute -left-6 top-[66%] text-[10px] font-medium uppercase tracking-[0.2em] text-[rgb(221,156,221)]">I</div>
+          <Handle id="text" type="target" position={Position.Left} style={{ top: '18%' }} className="!h-5 !w-5 !border-2 !border-[var(--text-faint)] !bg-[var(--text)]" />
+          <Handle id="context" type="target" position={Position.Left} style={{ top: '38%' }} className="!h-5 !w-5 !border-2 !border-[rgb(111,126,255)] !bg-[rgb(111,126,255)]" />
+          <Handle id="instruction" type="target" position={Position.Left} style={{ top: '58%' }} className="!h-5 !w-5 !border-2 !border-[rgb(201,108,210)] !bg-[rgb(201,108,210)]" />
+          <Handle id="image" type="target" position={Position.Left} style={{ top: '78%' }} className="!h-5 !w-5 !border-2 !border-[#63b4d8] !bg-[#63b4d8]" />
+          <div className="pointer-events-none absolute -left-6 top-[12%] text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--text-dim)]">T</div>
+          <div className="pointer-events-none absolute -left-6 top-[32%] text-[10px] font-medium uppercase tracking-[0.2em] text-[rgb(162,170,255)]">C</div>
+          <div className="pointer-events-none absolute -left-6 top-[52%] text-[10px] font-medium uppercase tracking-[0.2em] text-[rgb(221,156,221)]">I</div>
+          <div className="pointer-events-none absolute -left-8 top-[72%] text-[10px] font-medium uppercase tracking-[0.16em] text-[#8bc5dc]">Img</div>
         </>
       )}
       <Handle
         id="output"
         type="source"
         position={Position.Right}
-        style={{ top: '28%' }}
+        style={{ top: node.type === 'image' ? '50%' : '28%' }}
         className={`!h-5 !w-5 !border-2 ${outputHandleColors[node.type]}`}
       />
       <div className="flex h-full flex-col">
@@ -1993,9 +2048,28 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
               )}
             </div>
           </div>
+        ) : node.type === 'image' ? (
+          <div className="flex flex-1 min-h-0 flex-col gap-3">
+            <div className="min-h-0 overflow-hidden rounded-[14px] border border-[rgba(99,180,216,0.34)] bg-black/20">
+              {getImagePreviewUrl(node) ? (
+                <img src={getImagePreviewUrl(node)!} alt={node.title || node.image?.originalName || 'Image'} className="h-full max-h-[220px] w-full object-cover" draggable={false} />
+              ) : (
+                <div className="flex h-40 items-center justify-center text-sm text-[var(--text-dim)]">No preview available.</div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
+              {node.image?.originalName && <span>{node.image.originalName}</span>}
+              {formatImageDimensions(node.image?.width, node.image?.height) && <span>{formatImageDimensions(node.image?.width, node.image?.height)}</span>}
+            </div>
+            <div
+              className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]"
+              style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}
+              onDoubleClick={() => data.onStartEdit(node.id)}
+            >{getNodePreview(node.content) || 'No notes yet.'}</div>
+          </div>
         ) : (
           <div
-            className={`node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]${data.isSelected ? ' nowheel' : ''}`}
+            className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]"
             style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}
             onDoubleClick={() => data.onStartEdit(node.id)}
           >{getNodePreview(node.content) || 'No content yet.'}</div>
@@ -3033,6 +3107,8 @@ function defaultTitle(type: NodeType): string {
       return 'Context'
     case 'instruction':
       return 'Instruction'
+    case 'image':
+      return 'Image'
     default:
       return 'Text'
   }
@@ -3091,6 +3167,7 @@ function collectDownstreamTextNodes(sourceNodeId: string, nodes: GraphNodeRecord
 function displayNodeTypeLabel(type: NodeType, isLocal = false): string {
   if (type === 'instruction') return isLocal ? 'local instruction' : 'global instruction'
   if (type === 'context') return isLocal ? 'local context' : 'global context'
+  if (type === 'image') return 'image'
   return type
 }
 
@@ -3103,6 +3180,7 @@ function getMiniMapNodeColor(node: Node<AppNodeData>): string {
   const type = graphNode?.type
   if (type === 'context') return graphNode?.isLocal ? '#2e4f82' : '#1e3a6b'
   if (type === 'instruction') return graphNode?.isLocal ? '#6c3d63' : '#5b2d5d'
+  if (type === 'image') return '#4d9fc3'
   return '#3f4150'
 }
 
@@ -3199,22 +3277,24 @@ function wouldCreateCycle(sourceId: string, targetId: string, edges: GraphEdgeRe
   return false
 }
 
-function resolveTargetHandleForEdge(edge: GraphEdgeRecord, nodes: GraphNodeRecord[] | Map<string, GraphNodeRecord>): TextInputHandle | null {
+function resolveTargetHandleForEdge(edge: GraphEdgeRecord, nodes: GraphNodeRecord[] | Map<string, GraphNodeRecord>): NodeInputHandle | null {
   if (edge.targetHandle) return edge.targetHandle
   const nodeMap = nodes instanceof Map ? nodes : new Map(nodes.map((node) => [node.id, node]))
   const sourceType = nodeMap.get(edge.sourceId)?.type
   return sourceType ? defaultTargetHandleForNodeType(sourceType) : null
 }
 
-function defaultTargetHandleForNodeType(type: NodeType): TextInputHandle {
+function defaultTargetHandleForNodeType(type: NodeType): NodeInputHandle {
   if (type === 'text') return 'text'
   if (type === 'context') return 'context'
+  if (type === 'image') return 'image'
   return 'instruction'
 }
 
-function targetHandleLabel(handle: TextInputHandle): string {
+function targetHandleLabel(handle: NodeInputHandle): string {
   if (handle === 'text') return 'Text'
   if (handle === 'context') return 'Context'
+  if (handle === 'image') return 'Image'
   return 'Instruction'
 }
 function RoundedSmoothStepEdge({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, markerStart }: EdgeProps) {
@@ -3224,22 +3304,28 @@ function RoundedSmoothStepEdge({ sourceX, sourceY, targetX, targetY, sourcePosit
 
 const edgeTypes = { smoothstep: RoundedSmoothStepEdge }
 
-function edgeStyleForHandle(handle: TextInputHandle | null) {
+function edgeStyleForHandle(handle: NodeInputHandle | null) {
   if (handle === 'context') {
     return { strokeWidth: 2.6, stroke: '#6170d8', opacity: 0.84 }
   }
   if (handle === 'instruction') {
     return { strokeWidth: 2.6, stroke: '#a267c8', opacity: 0.84 }
   }
+  if (handle === 'image') {
+    return { strokeWidth: 2.8, stroke: '#4d9fc3', opacity: 0.9 }
+  }
   return { strokeWidth: 4, stroke: '#6a728f', opacity: 0.84 }
 }
 
-function selectedEdgeStyleForHandle(handle: TextInputHandle | null) {
+function selectedEdgeStyleForHandle(handle: NodeInputHandle | null) {
   if (handle === 'context') {
     return { strokeWidth: 3.5, stroke: '#7b89f0', opacity: 1 }
   }
   if (handle === 'instruction') {
     return { strokeWidth: 3.5, stroke: '#bf79df', opacity: 1 }
+  }
+  if (handle === 'image') {
+    return { strokeWidth: 3.8, stroke: '#74c1e3', opacity: 1 }
   }
   return { strokeWidth: 4.5, stroke: '#8b95b8', opacity: 1 }
 }

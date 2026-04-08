@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { nativeImage, contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('graphChat', {
   bootstrap: () => ipcRenderer.invoke('bootstrap'),
@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('graphChat', {
   openProject: (id: string) => ipcRenderer.invoke('project:open', id),
   saveProjectSnapshot: (snapshot) => ipcRenderer.invoke('project:saveSnapshot', snapshot),
   createNode: (input) => ipcRenderer.invoke('node:create', input),
+  createImageNode: (input) => ipcRenderer.invoke('node:createImage', input),
   updateNode: (input) => ipcRenderer.invoke('node:update', input),
   deleteNode: (id: string) => ipcRenderer.invoke('node:delete', id),
   createEdge: (projectId: string, sourceId: string, targetId: string, sourceHandle, targetHandle) => ipcRenderer.invoke('edge:create', projectId, sourceId, targetId, sourceHandle, targetHandle),
@@ -22,6 +23,10 @@ contextBridge.exposeInMainWorld('graphChat', {
   startGeneration: (payload) => ipcRenderer.invoke('generation:start', payload),
   stopGeneration: (generationId: string) => ipcRenderer.invoke('generation:stop', generationId),
   exportReader: (name: string, content: string) => ipcRenderer.invoke('reader:export', name, content),
+  toImageDataUrl: (filePath: string) => {
+    const image = nativeImage.createFromPath(filePath)
+    return image.isEmpty() ? null : image.toDataURL()
+  },
   onGenerationDelta: (callback) => {
     const listener = (_event, payload) => callback(payload)
     ipcRenderer.on('generation:delta', listener)

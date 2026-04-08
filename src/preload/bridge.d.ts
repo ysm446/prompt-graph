@@ -16,7 +16,7 @@ export interface GraphChatApi {
   saveProjectSnapshot(snapshot: ProjectSnapshot): Promise<{ projects: ProjectRecord[]; snapshot: ProjectSnapshot }>
   createNode(input: {
     projectId: string
-    type: 'text' | 'context' | 'instruction'
+    type: 'text' | 'context' | 'instruction' | 'image'
     title?: string
     content?: string
     instruction?: string | null
@@ -48,6 +48,7 @@ export interface GraphChatApi {
   }>
   stopGeneration(generationId: string): Promise<void>
   exportReader(name: string, content: string): Promise<{ saved: boolean; filePath?: string }>
+  toImageDataUrl(filePath: string): string | null
   onGenerationDelta(callback: (payload: { generationId: string; nodeId: string; content: string }) => void): () => void
   onGenerationDone(callback: (payload: { generationId: string; nodeId: string; snapshot: ProjectSnapshot; projects: ProjectRecord[] }) => void): () => void
   onGenerationError(callback: (payload: { generationId: string; message: string; nodeId: string }) => void): () => void
