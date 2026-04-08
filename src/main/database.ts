@@ -343,6 +343,19 @@ export class GraphRepository {
       size: defaultNodeSize('image', image)
     })
   }
+  replaceImageNode(id: string, sourcePath: string): GraphNodeRecord {
+    const current = this.getNode(id)
+    if (current.type !== 'image') {
+      throw new Error('Only image nodes can replace images.')
+    }
+    const image = this.copyImageAsset(sourcePath)
+    return this.updateNode({
+      id,
+      title: current.title.trim() === '' || current.title === 'Image' ? stripExtension(image.originalName) : current.title,
+      image,
+      size: current.image ? current.size : defaultNodeSize('image', image)
+    })
+  }
 
   updateNode(input: UpdateNodeInput): GraphNodeRecord {
     const now = new Date().toISOString()

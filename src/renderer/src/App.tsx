@@ -35,6 +35,7 @@ type AppNodeData = {
   onStartEdit: (id: string) => void
   onStopEdit: () => void
   onGenerate: (id: string) => void
+  onPickImage: (id: string) => void
   onProofreadRequest: (payload: ProofreadRequestPayload) => void
   onResize: (id: string, input: { position: { x: number; y: number }; size: { width: number; height: number } }) => void
 }
@@ -617,6 +618,7 @@ function GraphChatApp() {
         },
         onStopEdit: () => setEditingNodeId(null),
         onGenerate: handleGenerate,
+        onPickImage: (id) => { void replaceImageForNode(id) },
         onProofreadRequest: handleProofreadRequest,
         onResize: handleResize
       }
@@ -747,7 +749,7 @@ function GraphChatApp() {
       createdAt: now,
       updatedAt: now,
       position: position ? base : normalizePosition({ x: base.x + 40, y: base.y + 160 }, isSnapToGridEnabled),
-      size: { width: 480, height: 360 }
+      size: type === 'image' ? { width: 360, height: 280 } : { width: 480, height: 360 }
     }
     applySnapshot({ ...snapshot, nodes: [...snapshot.nodes, node] })
     setIsProjectDirty(true)
@@ -758,27 +760,19 @@ function GraphChatApp() {
     setStatus(`${defaultTitle(type)} node created`)
   }
 
-
   async function addImageNode(position?: { x: number; y: number }) {
     const snapshot = snapshotRef.current
     if (!activeProjectId || !snapshot) return
     const base = normalizePosition(position ?? (selectedNode?.position ?? { x: 120, y: 120 }), isSnapToGridEnabled)
-    const importPosition = position ? base : normalizePosition({ x: base.x + 40, y: base.y + 160 }, isSnapToGridEnabled)
-    let latestSnapshot = snapshot
-    if (isProjectDirty) {
-      const saved = await window.graphChat.saveProjectSnapshot(snapshot)
-      setProjects(saved.projects)
-      applySnapshot(saved.snapshot)
-      setIsProjectDirty(false)
-      latestSnapshot = saved.snapshot
-    }
-    const result = await window.graphChat.createImageNode({ projectId: activeProjectId, position: importPosition })
-    if (result.canceled) {
-      if (latestSnapshot !== snapshot) {
-        setStatus(`Saved ${latestSnapshot.project.name}`)
-      }
-      return
-    }
+    const nodePosition = position ? base : normalizePosition({ x: base.x + 40, y: base.y + 160 }, isSnapToGridEnabled)
+    const result = await window.graphChat.createNode({
+      projectId: activeProjectId,
+      type: 'image',
+      title: 'Image',
+      content: '',
+      position: nodePosition,
+      size: { width: 360, height: 280 }
+    })
     setProjects(result.projects)
     applySnapshot(result.snapshot)
     setIsProjectDirty(true)
@@ -788,6 +782,20 @@ function GraphChatApp() {
     setNodeMenu(null)
     setStatus('Image node created')
   }
+
+  async function replaceImageForNode(nodeId: string) {
+    const result = await window.graphChat.replaceImageNode(nodeId)
+    if (result.canceled || !result.node || !result.snapshot || !result.projects) return
+    setProjects(result.projects)
+    applySnapshot(result.snapshot)
+    setIsProjectDirty(true)
+    selectNode(result.node.id)
+    setSelectedEdge(null)
+    setCanvasMenu(null)
+    setNodeMenu(null)
+    setStatus('Image updated')
+  }
+
   async function persistNode(node: GraphNodeRecord) {
     const updated = { ...node, updatedAt: new Date().toISOString() }
     mutateLocalNode(updated)
@@ -2078,16 +2086,49 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
           </div>
         ) : node.type === 'image' ? (
           <div className="flex flex-1 min-h-0 flex-col gap-3">
-            <div className="min-h-0 overflow-hidden rounded-[14px] border border-[rgba(102,159,224,0.34)] bg-black/20">
+            <button
+              type="button"
+              className="nodrag nopan min-h-0 overflow-hidden rounded-[14px] border border-[rgba(102,159,224,0.34)] bg-black/20 text-left transition hover:border-[rgba(121,175,232,0.7)] hover:bg-black/25"
+              onMouseDown={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+              }}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                data.onPickImage(node.id)
+              }}
+            >
               {getImagePreviewUrl(node) ? (
-                <img src={getImagePreviewUrl(node)!} alt={node.title || node.image?.originalName || 'Image'} className="h-full max-h-[220px] w-full object-cover" draggable={false} />
+                <img src={getImagePreviewUrl(node)!} alt={node.title || node.image?.originalName || 'Image'} className="h-auto w-full object-contain" draggable={false} />
               ) : (
-                <div className="flex h-40 items-center justify-center text-sm text-[var(--text-dim)]">No preview available.</div>
+                <div className="flex h-40 flex-col items-center justify-center gap-3 text-[var(--text-dim)]">
+                  <FileImageIcon className="h-12 w-12 text-[#8db6e8]" />
+                  <div className="text-sm font-medium text-[var(--text)]">Click to load image</div>
+                  <div className="text-xs">PNG, JPG, GIF, WebP, BMP</div>
+                </div>
               )}
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--text-dim)]">
-              {node.image?.originalName && <span>{node.image.originalName}</span>}
-              {formatImageDimensions(node.image?.width, node.image?.height) && <span>{formatImageDimensions(node.image?.width, node.image?.height)}</span>}
+            </button>
+            <div className="flex items-center justify-between gap-3 text-xs text-[var(--text-dim)]">
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {node.image?.originalName && <span>{node.image.originalName}</span>}
+                {formatImageDimensions(node.image?.width, node.image?.height) && <span>{formatImageDimensions(node.image?.width, node.image?.height)}</span>}
+              </div>
+              <button
+                type="button"
+                className="nodrag nopan shrink-0 rounded-[10px] border border-[rgba(102,159,224,0.44)] px-3 py-1 text-[11px] font-medium text-[#8db6e8] transition hover:border-[rgba(121,175,232,0.8)] hover:text-[#c4d8f8]"
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  data.onPickImage(node.id)
+                }}
+              >
+                {node.image ? 'Replace image' : 'Load image'}
+              </button>
             </div>
             <div
               className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]"
@@ -2966,6 +3007,17 @@ function NewFolderIcon({ className }: { className?: string }) {
   )
 }
 
+
+function FileImageIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7.5 3.5z" />
+      <path d="M14 3.5V8h4" />
+      <circle cx="10" cy="11" r="1.4" />
+      <path d="m8 17 3.2-3.2a1 1 0 0 1 1.4 0L14 15l1.1-1.1a1 1 0 0 1 1.4 0L18 15.4" />
+    </svg>
+  )
+}
 function SearchIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">

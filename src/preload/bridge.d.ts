@@ -26,6 +26,7 @@ export interface GraphChatApi {
     position?: { x: number; y: number }
     size?: { width: number; height: number }
   }): Promise<{ node: GraphNodeRecord; snapshot: ProjectSnapshot; projects: ProjectRecord[] }>
+  replaceImageNode(nodeId: string): Promise<{ canceled: boolean; node?: GraphNodeRecord; snapshot?: ProjectSnapshot; projects?: ProjectRecord[] }>
   updateNode(input: {
     id: string
     title?: string

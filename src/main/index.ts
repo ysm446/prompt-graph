@@ -207,7 +207,22 @@ function registerIpc(): void {
     const node = repository.importImageNode({ projectId: input.projectId, sourcePath: result.filePaths[0], position: input.position })
     return { canceled: false as const, node, snapshot: repository.getProjectSnapshot(node.projectId), projects: repository.listProjects() }
   })
-  ipcMain.handle('node:update', async (_event, input) => repository.updateNode(input))
+  ipcMain.handle('node:replaceImage', async (_event, nodeId: string) => {
+    const current = repository.getNode(nodeId)
+    if (current.type !== 'image') {
+      throw new Error('Only image nodes can replace images.')
+    }
+    const result = await dialog.showOpenDialog({
+      title: current.image ? 'Replace Image' : 'Select Image',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }
+      ]
+    })
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true as const }
+    const node = repository.replaceImageNode(nodeId, result.filePaths[0])
+    return { canceled: false as const, node, snapshot: repository.getProjectSnapshot(node.projectId), projects: repository.listProjects() }
+  })
   ipcMain.handle('node:delete', async (_event, id: string) => {
     const node = repository.getNode(id)
     repository.deleteNode(id)
