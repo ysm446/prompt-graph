@@ -238,6 +238,7 @@ function GraphChatApp() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
   const [isProjectDirty, setIsProjectDirty] = useState(false)
+  const [isBootstrapped, setIsBootstrapped] = useState(false)
   const [status, setStatus] = useState('Loading...')
   const [error, setError] = useState<string | null>(null)
   const [generation, setGeneration] = useState<{ generationId: string; nodeId: string } | null>(null)
@@ -337,6 +338,7 @@ function GraphChatApp() {
       persistedSnapshotRef.current = snapshot
       setIsModelLoaded(settings.isModelLoaded)
       setIsProjectDirty(false)
+      setIsBootstrapped(true)
       hasLoadedPreferencesRef.current = true
       setStatus('Ready')
     }).catch((err) => {
@@ -345,8 +347,13 @@ function GraphChatApp() {
     })
   }, [])
 
+  const isInitialProjectLoadRef = useRef(true)
   useEffect(() => {
     if (!activeProjectId) return
+    if (isInitialProjectLoadRef.current) {
+      isInitialProjectLoadRef.current = false
+      return
+    }
     const saved = projectViewportsRef.current[activeProjectId]
     if (saved) reactFlow.setViewport(saved)
   }, [activeProjectId])
@@ -1437,6 +1444,10 @@ function GraphChatApp() {
   const nodeMenuNode = nodeMenu ? snapshotRef.current?.nodes.find((node) => node.id === nodeMenu.nodeId) ?? null : null
   const filteredModels = settings?.availableModels.filter((model) => model.name.toLowerCase().includes(modelFilter.toLowerCase())) ?? []
 
+  if (!isBootstrapped) {
+    return <div className="flex h-screen bg-[var(--bg)]" />
+  }
+
   return (
     <div className="flex h-screen flex-col bg-[var(--bg)] text-[var(--text)]" style={{ ...nodeTextStyleVars } as React.CSSProperties}>
       <header className="relative z-30 h-10 border-b border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
@@ -1757,6 +1768,7 @@ function GraphChatApp() {
           style={canvasStyle}
           minZoom={0.1}
           maxZoom={2}
+          defaultViewport={projectViewportsRef.current[activeProjectId] ?? { x: 0, y: 0, zoom: 1 }}
           snapToGrid={isSnapToGridEnabled}
           snapGrid={snapGrid}
           onPaneContextMenu={openCanvasMenu}
