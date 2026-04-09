@@ -730,7 +730,9 @@ function GraphChatApp() {
     if (!snapshot || !isProjectDirty) return
     setError(null)
     try {
-      const result = await window.graphChat.saveProjectSnapshot(snapshot)
+      const liveSnapshot = buildSnapshotFromCanvas(snapshot, reactFlow.getNodes(), isSnapToGridEnabled)
+      snapshotRef.current = liveSnapshot
+      const result = await window.graphChat.saveProjectSnapshot(liveSnapshot)
       setProjects(result.projects)
       applySnapshot(result.snapshot)
       persistedSnapshotRef.current = result.snapshot
@@ -809,13 +811,13 @@ function GraphChatApp() {
     const snapshot = snapshotRef.current
     if (!snapshot) return
 
-    const existsInPersistedSnapshot = persistedSnapshotRef.current?.nodes.some((node) => node.id === nodeId) ?? false
-    if (!existsInPersistedSnapshot) {
-      const syncResult = await window.graphChat.saveProjectSnapshot(snapshot)
-      setProjects(syncResult.projects)
-      applySnapshot(syncResult.snapshot)
-      setIsProjectDirty(true)
-    }
+    const liveSnapshot = buildSnapshotFromCanvas(snapshot, reactFlow.getNodes(), isSnapToGridEnabled)
+    snapshotRef.current = liveSnapshot
+
+    const syncResult = await window.graphChat.saveProjectSnapshot(liveSnapshot)
+    setProjects(syncResult.projects)
+    applySnapshot(syncResult.snapshot)
+    setIsProjectDirty(true)
 
     const result = await window.graphChat.replaceImageNode(nodeId)
     if (result.canceled || !result.node || !result.snapshot || !result.projects) return
@@ -3351,6 +3353,27 @@ function normalizeNodeBounds(
 function normalizePosition(position: { x: number; y: number }, shouldSnap: boolean) {
   return shouldSnap ? snapPositionToGrid(position) : position
 }
+function buildSnapshotFromCanvas(snapshot: ProjectSnapshot, flowNodes: Array<Node<AppNodeData>>, shouldSnap: boolean): ProjectSnapshot {
+  const flowNodeMap = new Map(flowNodes.map((node) => [node.id, node]))
+  return {
+    ...snapshot,
+    nodes: snapshot.nodes.map((node) => {
+      const flowNode = flowNodeMap.get(node.id)
+      if (!flowNode) return node
+      const nextPosition = normalizePosition(flowNode.position, shouldSnap)
+      const nextSize = {
+        width: typeof flowNode.width === 'number' ? flowNode.width : node.size.width,
+        height: typeof flowNode.height === 'number' ? flowNode.height : node.size.height
+      }
+      return {
+        ...node,
+        position: nextPosition,
+        size: nextSize
+      }
+    })
+  }
+}
+
 
 function estimateTokenCount(text: string): number {
   const trimmed = text.trim()
