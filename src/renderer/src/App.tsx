@@ -1918,6 +1918,30 @@ function GraphChatApp() {
   )
 }
 
+function ExternalNodeTitle({ title }: { title: string }) {
+  const { zoom } = useViewport()
+  const FADE_START = 0.65
+  const FADE_END = 0.5
+  const opacity = zoom >= FADE_START ? 0 : zoom <= FADE_END ? 1 : (FADE_START - zoom) / (FADE_START - FADE_END)
+  if (opacity <= 0) return null
+  return (
+    <div
+      className="pointer-events-none absolute left-0 whitespace-nowrap text-[var(--text)]"
+      style={{
+        bottom: `calc(100% + ${6 / zoom}px)`,
+        fontSize: `${12 / zoom}px`,
+        opacity,
+        lineHeight: 1.2,
+        fontFamily: 'var(--node-title-font-family)',
+        fontWeight: 'var(--node-title-font-weight)',
+        letterSpacing: 'var(--node-title-letter-spacing)',
+      }}
+    >
+      {title || 'Untitled'}
+    </div>
+  )
+}
+
 function GraphNodeCard({ data }: { data: AppNodeData }) {
   const node = data.graphNode
   const [draftTitle, setDraftTitle] = useState(node.title)
@@ -1927,10 +1951,6 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   const wasEditingRef = useRef(data.isEditing)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { zoom } = useViewport()
-  const FADE_START = 0.65
-  const FADE_END = 0.5
-  const externalTitleOpacity = zoom >= FADE_START ? 0 : zoom <= FADE_END ? 1 : (FADE_START - zoom) / (FADE_START - FADE_END)
   const borderStyle = node.type === 'text' || node.type === 'image' || !node.isLocal ? 'border-solid' : 'border-dashed'
   const colors = {
     text: 'border-[#6b7280] bg-[var(--bg-card)]',
@@ -1977,22 +1997,7 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
   return (
     <div className={`relative h-full w-full rounded-3xl border-2 px-9 py-6 shadow-lg shadow-black/30 transition ${borderStyle} ${colors[node.type]} ${!data.isGenerating && data.isSelected ? 'ring-4 ring-[var(--accent-border)]' : ''}`} onMouseDown={() => data.onSelect(node.id)}>
       {data.isGenerating && <div className="node-generating-border pointer-events-none absolute inset-0 rounded-3xl" />}
-      {externalTitleOpacity > 0 && (
-        <div
-          className="pointer-events-none absolute left-0 whitespace-nowrap text-[var(--text)]"
-          style={{
-            bottom: `calc(100% + ${6 / zoom}px)`,
-            fontSize: `${12 / zoom}px`,
-            opacity: externalTitleOpacity,
-            lineHeight: 1.2,
-            fontFamily: 'var(--node-title-font-family)',
-            fontWeight: 'var(--node-title-font-weight)',
-            letterSpacing: 'var(--node-title-letter-spacing)',
-          }}
-        >
-          {node.title || 'Untitled'}
-        </div>
-      )}
+      <ExternalNodeTitle title={node.title} />
       <NodeResizeControl
         position="bottom-right"
         className={`${data.isSelected ? 'opacity-100' : 'opacity-0 pointer-events-none'} !h-3 !w-3 !rounded-[6px] !border !border-[var(--text-faint)] !bg-[var(--text)] shadow`}
