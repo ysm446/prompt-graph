@@ -193,11 +193,6 @@ function getTextStyleCssVars(titlePreset: TextStylePreset, contentPreset: TextSt
   } as React.CSSProperties
 }
 
-function getNodePreview(content: string, maxChars = 260): string {
-  const normalized = content.trim()
-  if (normalized.length <= maxChars) return normalized
-  return `${normalized.slice(0, maxChars).trimEnd()}...`
-}
 
 function getImageAssetUrl(path: string | null | undefined): string | null {
   if (!path) return null
@@ -2210,14 +2205,14 @@ function GraphNodeCard({ data }: { data: AppNodeData }) {
               className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]"
               style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}
               onDoubleClick={() => data.onStartEdit(node.id)}
-            >{getNodePreview(node.content) || 'No notes yet.'}</div>
+            >{node.content.trim() || 'No notes yet.'}</div>
           </div>
         ) : (
           <div
             className="node-scrollbar flex-1 overflow-y-auto whitespace-pre-wrap pr-1 text-[var(--text)]"
             style={{ fontFamily: 'var(--node-content-font-family)', fontSize: 'var(--node-content-font-size)', fontWeight: 'var(--node-content-font-weight)', lineHeight: 'var(--node-content-line-height)', letterSpacing: 'var(--node-content-letter-spacing)' }}
             onDoubleClick={() => data.onStartEdit(node.id)}
-          >{getNodePreview(node.content) || 'No content yet.'}</div>
+          >{node.content.trim() || 'No content yet.'}</div>
         )}
         {node.generationMeta && (
           <div className="mt-3 flex items-center gap-x-2 text-xs text-[var(--text-dim)]">
