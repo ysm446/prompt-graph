@@ -4,6 +4,7 @@ import {
   Handle,
   MiniMap,
   NodeResizeControl,
+  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -270,6 +271,7 @@ function GraphChatApp() {
   const [rightInspectorWidth, setRightInspectorWidth] = useState(DEFAULT_RIGHT_INSPECTOR_WIDTH)
   const [generalSections, setGeneralSections] = useState<{ context: boolean; interface: boolean; textStyle: boolean; editing: boolean; debug: boolean }>({ context: true, interface: true, textStyle: true, editing: true, debug: true })
   const [isPromptLogEnabled, setIsPromptLogEnabled] = useState(false)
+  const [isSystemMonitorVisible, setIsSystemMonitorVisible] = useState(true)
   const [promptLogs, setPromptLogs] = useState<Array<{ generationId: string; nodeTitle: string; systemPrompt: string; userMessage: string; timestamp: string }>>([])
   const MAX_PROMPT_LOGS = 20
   const [textStyleTarget, setTextStyleTarget] = useState<TextStyleTarget>('both')
@@ -320,6 +322,7 @@ function GraphChatApp() {
       setRightInspectorWidth(Math.max(uiPreferences.rightInspectorWidth, DEFAULT_RIGHT_INSPECTOR_WIDTH))
       setGeneralSections({ ...uiPreferences.generalSections, debug: uiPreferences.generalSections.debug ?? true })
       setIsPromptLogEnabled(uiPreferences.isPromptLogEnabled ?? false)
+      setIsSystemMonitorVisible(uiPreferences.isSystemMonitorVisible ?? true)
       setTextStyleTarget(uiPreferences.textStyleTarget)
       setTextStylePreset(uiPreferences.textStylePreset)
       setTitleTextStylePreset(uiPreferences.titleTextStylePreset)
@@ -368,6 +371,7 @@ function GraphChatApp() {
       rightInspectorWidth,
       generalSections,
       isPromptLogEnabled,
+      isSystemMonitorVisible,
       nodeFontSize: contentFontSize,
       textStyleTarget,
       textStylePreset,
@@ -377,7 +381,7 @@ function GraphChatApp() {
       contentFontSize
     }
     void window.graphChat.savePreferences(payload)
-  }, [isSidebarOpen, isSettingsPanelOpen, isPropertiesPanelOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, proofreadPreset, leftSidebarWidth, rightInspectorWidth, generalSections, isPromptLogEnabled, textStyleTarget, textStylePreset, titleTextStylePreset, contentTextStylePreset, titleFontSize, contentFontSize])
+  }, [isSidebarOpen, isSettingsPanelOpen, isPropertiesPanelOpen, isMiniMapVisible, isSnapToGridEnabled, edgeType, isProofreadEnabled, proofreadPreset, leftSidebarWidth, rightInspectorWidth, generalSections, isPromptLogEnabled, isSystemMonitorVisible, textStyleTarget, textStylePreset, titleTextStylePreset, contentTextStylePreset, titleFontSize, contentFontSize])
 
   useEffect(() => {
     setNodes((current) => {
@@ -1806,6 +1810,7 @@ function GraphChatApp() {
         >
           {isMiniMapVisible && <MiniMap pannable zoomable nodeColor={(node) => getMiniMapNodeColor(node as Node<AppNodeData>)} />}
           <Background gap={GRID_SIZE} size={1.4} color="#394154" />
+          {isSystemMonitorVisible && <SystemResourceMonitor />}
         </ReactFlow>
       </main>
 
@@ -1905,6 +1910,10 @@ function GraphChatApp() {
               onChangeTemperature={(value) => void handleTemperatureChange(value)}
               isPromptLogEnabled={isPromptLogEnabled}
               onTogglePromptLog={() => setIsPromptLogEnabled((current) => !current)}
+              isSystemMonitorVisible={isSystemMonitorVisible}
+              onToggleSystemMonitor={() => {
+                setIsSystemMonitorVisible((current) => !current)
+              }}
               promptLogs={promptLogs}
               onClearPromptLogs={() => setPromptLogs([])}
             />
@@ -2573,6 +2582,8 @@ function GeneralInspector({
   onChangeTemperature,
   isPromptLogEnabled,
   onTogglePromptLog,
+  isSystemMonitorVisible,
+  onToggleSystemMonitor,
   promptLogs,
   onClearPromptLogs
 }: {
@@ -2604,6 +2615,8 @@ function GeneralInspector({
   onChangeTemperature: (value: number) => void
   isPromptLogEnabled: boolean
   onTogglePromptLog: () => void
+  isSystemMonitorVisible: boolean
+  onToggleSystemMonitor: () => void
   promptLogs: Array<{ generationId: string; nodeTitle: string; systemPrompt: string; userMessage: string; timestamp: string }>
   onClearPromptLogs: () => void
 }) {
@@ -2895,6 +2908,18 @@ function GeneralInspector({
         open={sections.debug}
         onToggle={() => onToggleSection('debug')}
       >
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] text-[var(--text-dim)]">システムモニター</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isSystemMonitorVisible}
+            onClick={onToggleSystemMonitor}
+            className={`relative h-[16px] w-[28px] rounded-full transition ${isSystemMonitorVisible ? 'bg-[var(--accent-hover)]' : 'bg-[rgba(255,255,255,0.1)]'}`}
+          >
+            <span className={`absolute top-[2px] h-[12px] w-[12px] rounded-full transition ${isSystemMonitorVisible ? 'left-[14px] bg-white' : 'left-[2px] bg-[rgba(255,255,255,0.35)]'}`} />
+          </button>
+        </div>
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] text-[var(--text-dim)]">プロンプトログ出力</span>
           <button
@@ -3533,6 +3558,85 @@ function selectedEdgeStyleForHandle(handle: NodeInputHandle | null) {
     return { strokeWidth: 3.8, stroke: '#79afe8', opacity: 1 }
   }
   return { strokeWidth: 4.5, stroke: '#8b95b8', opacity: 1 }
+}
+
+// ── System resource monitor ───────────────────────────────────────────────────
+
+type SystemResources = {
+  cpuUsage: number
+  ramUsed: number
+  ramTotal: number
+  gpuUsage: number | null
+  vramUsed: number | null
+  vramTotal: number | null
+}
+
+function ResourceBar({ label, pct, detail }: { label: string; pct: number; detail: string }) {
+  const clampedPct = Math.min(100, Math.max(0, pct))
+  const barColor = clampedPct > 85 ? '#ef4444' : clampedPct > 65 ? '#f97316' : 'var(--accent)'
+  return (
+    <div className="flex flex-col gap-[3px]">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-medium tracking-wide opacity-70">{label}</span>
+        <span className="text-[10px] tabular-nums opacity-60">{detail}</span>
+      </div>
+      <div className="h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${clampedPct}%`, backgroundColor: barColor }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function fmtBytes(bytes: number): string {
+  const gb = bytes / (1024 ** 3)
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / (1024 ** 2)).toFixed(0)} MB`
+}
+
+function fmtMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`
+}
+
+function SystemResourceMonitor() {
+  const [res, setRes] = useState<SystemResources | null>(null)
+
+  useEffect(() => {
+    const off = window.graphChat.onSystemResources((payload) => setRes(payload))
+    return off
+  }, [])
+
+  if (!res) return null
+
+  const hasGpu = res.gpuUsage !== null
+  const hasVram = res.vramUsed !== null && res.vramTotal !== null
+
+  return (
+    <Panel position="bottom-right">
+      <div className="mb-3 mr-3 w-44 rounded-xl border border-white/10 bg-black/45 px-3 py-2.5 text-[var(--text)] backdrop-blur-sm">
+        <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest opacity-40">System</div>
+        <div className="flex flex-col gap-2">
+          <ResourceBar label="CPU" pct={res.cpuUsage} detail={`${res.cpuUsage}%`} />
+          <ResourceBar
+            label="RAM"
+            pct={(res.ramUsed / res.ramTotal) * 100}
+            detail={`${fmtBytes(res.ramUsed)} / ${fmtBytes(res.ramTotal)}`}
+          />
+          {hasGpu && (
+            <ResourceBar label="GPU" pct={res.gpuUsage!} detail={`${res.gpuUsage}%`} />
+          )}
+          {hasVram && (
+            <ResourceBar
+              label="VRAM"
+              pct={(res.vramUsed! / res.vramTotal!) * 100}
+              detail={`${fmtMb(res.vramUsed!)} / ${fmtMb(res.vramTotal!)}`}
+            />
+          )}
+        </div>
+      </div>
+    </Panel>
+  )
 }
 
 export default App

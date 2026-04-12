@@ -114,6 +114,7 @@ export interface UiPreferences {
   titleFontSize: number
   contentFontSize: number
   isPromptLogEnabled: boolean
+  isSystemMonitorVisible: boolean
   generalSections: {
     context: boolean
     interface: boolean

@@ -65,6 +65,11 @@ contextBridge.exposeInMainWorld('graphChat', {
     const listener = (_event, payload) => callback(payload)
     ipcRenderer.on('debug:promptLog', listener)
     return () => ipcRenderer.off('debug:promptLog', listener)
+  },
+  onSystemResources: (callback) => {
+    const listener = (_event, payload) => callback(payload)
+    ipcRenderer.on('system:resources', listener)
+    return () => ipcRenderer.off('system:resources', listener)
   }
 })
 

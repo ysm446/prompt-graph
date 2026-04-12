@@ -3,9 +3,110 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import * as os from 'node:os'
+import { exec } from 'node:child_process'
 import { GraphRepository } from './database'
 import { LlamaServerManager } from './llamaServer'
 import type { GraphEdgeRecord, GraphNodeRecord, ImageAsset, NodeInputHandle, NodeType, ProjectSnapshot, UiPreferences } from './types'
+
+// ── System resource monitoring ────────────────────────────────────────────────
+
+type CpuSample = Array<{ idle: number; total: number }>
+
+function sampleCpus(): CpuSample {
+  return os.cpus().map((cpu) => {
+    const times = cpu.times
+    const total = (Object.values(times) as number[]).reduce((a, b) => a + b, 0)
+    return { idle: times.idle, total }
+  })
+}
+
+function computeCpuUsage(prev: CpuSample, curr: CpuSample): number {
+  let totalDelta = 0
+  let idleDelta = 0
+  for (let i = 0; i < prev.length; i++) {
+    totalDelta += curr[i].total - prev[i].total
+    idleDelta += curr[i].idle - prev[i].idle
+  }
+  return totalDelta === 0 ? 0 : (1 - idleDelta / totalDelta) * 100
+}
+
+type GpuInfo = { gpuUsage: number | null; vramUsed: number | null; vramTotal: number | null }
+
+let nvidiaSmiAvailable: boolean | null = null
+
+function queryNvidiaSmi(): Promise<GpuInfo> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve({ gpuUsage: null, vramUsed: null, vramTotal: null }), 3000)
+    exec(
+      'nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits',
+      (err, stdout) => {
+        clearTimeout(timeout)
+        if (err || !stdout) {
+          nvidiaSmiAvailable = false
+          resolve({ gpuUsage: null, vramUsed: null, vramTotal: null })
+          return
+        }
+        const parts = stdout
+          .trim()
+          .split(',')
+          .map((s) => parseFloat(s.trim()))
+        if (parts.length >= 3 && parts.every((n) => !isNaN(n))) {
+          nvidiaSmiAvailable = true
+          resolve({ gpuUsage: parts[0], vramUsed: parts[1], vramTotal: parts[2] })
+        } else {
+          nvidiaSmiAvailable = false
+          resolve({ gpuUsage: null, vramUsed: null, vramTotal: null })
+        }
+      }
+    )
+  })
+}
+
+let cpuSample: CpuSample = sampleCpus()
+let cachedGpuInfo: GpuInfo = { gpuUsage: null, vramUsed: null, vramTotal: null }
+let systemResourcesInterval: ReturnType<typeof setInterval> | null = null
+
+function startSystemResourcePolling(): void {
+  // GPU は 2 秒ごと、重い場合は前回キャッシュを使う
+  let gpuQueryInFlight = false
+  const refreshGpu = (): void => {
+    if (gpuQueryInFlight || nvidiaSmiAvailable === false) return
+    gpuQueryInFlight = true
+    void queryNvidiaSmi().then((info) => {
+      cachedGpuInfo = info
+      gpuQueryInFlight = false
+    })
+  }
+
+  // 初回 GPU 検出
+  refreshGpu()
+
+  systemResourcesInterval = setInterval(() => {
+    const prevSample = cpuSample
+    const currSample = sampleCpus()
+    cpuSample = currSample
+
+    const cpuUsage = Math.round(computeCpuUsage(prevSample, currSample))
+    const totalMem = os.totalmem()
+    const usedMem = totalMem - os.freemem()
+
+    refreshGpu()
+
+    const payload = {
+      cpuUsage,
+      ramUsed: usedMem,
+      ramTotal: totalMem,
+      gpuUsage: cachedGpuInfo.gpuUsage !== null ? Math.round(cachedGpuInfo.gpuUsage) : null,
+      vramUsed: cachedGpuInfo.vramUsed,
+      vramTotal: cachedGpuInfo.vramTotal
+    }
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('system:resources', payload)
+    }
+  }, 1000)
+}
 
 const generationControllers = new Map<string, AbortController>()
 const proofreadControllers = new Map<string, AbortController>()
@@ -35,6 +136,7 @@ const defaultUiPreferences: UiPreferences = {
   titleFontSize: 18,
   contentFontSize: 14,
   isPromptLogEnabled: false,
+  isSystemMonitorVisible: true,
   generalSections: {
     context: true,
     interface: true,
@@ -122,12 +224,14 @@ app.whenReady().then(() => {
   preferencesPath = join(app.getPath('userData'), 'preferences.json')
   registerIpc()
   createWindow()
+  startSystemResourcePolling()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
 app.on('window-all-closed', async () => {
+  if (systemResourcesInterval) clearInterval(systemResourcesInterval)
   if (llamaServer) await llamaServer.stop()
   if (process.platform !== 'darwin') app.quit()
 })
@@ -729,6 +833,7 @@ function mergeUiPreferences(input: Partial<UiPreferences>): UiPreferences {
     titleFontSize: input.titleFontSize ?? input.nodeFontSize ?? defaultUiPreferences.titleFontSize,
     contentFontSize: input.contentFontSize ?? input.nodeFontSize ?? defaultUiPreferences.contentFontSize,
     isPromptLogEnabled: input.isPromptLogEnabled ?? defaultUiPreferences.isPromptLogEnabled,
+    isSystemMonitorVisible: input.isSystemMonitorVisible ?? defaultUiPreferences.isSystemMonitorVisible,
     generalSections: {
       context: input.generalSections?.context ?? defaultUiPreferences.generalSections.context,
       interface: input.generalSections?.interface ?? defaultUiPreferences.generalSections.interface,

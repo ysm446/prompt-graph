@@ -60,6 +60,7 @@ export interface GraphChatApi {
   onProofreadDone(callback: (payload: { proofreadId: string; content: string }) => void): () => void
   onProofreadError(callback: (payload: { proofreadId: string; message: string }) => void): () => void
   onPromptLog(callback: (payload: { generationId: string; nodeId: string; nodeTitle: string; systemPrompt: string; userMessage: string }) => void): () => void
+  onSystemResources(callback: (payload: { cpuUsage: number; ramUsed: number; ramTotal: number; gpuUsage: number | null; vramUsed: number | null; vramTotal: number | null }) => void): () => void
 }
 
 declare global {
