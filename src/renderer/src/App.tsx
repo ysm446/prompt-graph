@@ -2920,7 +2920,7 @@ function GeneralInspector({
             <span className={`absolute top-[2px] h-[12px] w-[12px] rounded-full transition ${isSystemMonitorVisible ? 'left-[14px] bg-white' : 'left-[2px] bg-[rgba(255,255,255,0.35)]'}`} />
           </button>
         </div>
-        <div className="flex items-center justify-between gap-3">
+        <div className="mt-3 flex items-center justify-between gap-3">
           <span className="text-[13px] text-[var(--text-dim)]">プロンプトログ出力</span>
           <button
             type="button"
@@ -3575,17 +3575,15 @@ function ResourceBar({ label, pct, detail }: { label: string; pct: number; detai
   const clampedPct = Math.min(100, Math.max(0, pct))
   const barColor = clampedPct > 85 ? '#ef4444' : clampedPct > 65 ? '#f97316' : 'var(--accent)'
   return (
-    <div className="flex flex-col gap-[3px]">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[10px] font-medium tracking-wide opacity-70">{label}</span>
-        <span className="text-[10px] tabular-nums opacity-60">{detail}</span>
-      </div>
-      <div className="h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] font-medium opacity-50">{label}</span>
+      <div className="h-[3px] w-10 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full transition-[width] duration-500 ease-out"
           style={{ width: `${clampedPct}%`, backgroundColor: barColor }}
         />
       </div>
+      <span className="text-[10px] tabular-nums opacity-60">{detail}</span>
     </div>
   )
 }
@@ -3614,26 +3612,23 @@ function SystemResourceMonitor() {
 
   return (
     <Panel position="bottom-right">
-      <div className="mb-3 mr-3 w-44 rounded-xl border border-white/10 bg-black/45 px-3 py-2.5 text-[var(--text)] backdrop-blur-sm">
-        <div className="mb-2 text-[9px] font-semibold uppercase tracking-widest opacity-40">System</div>
-        <div className="flex flex-col gap-2">
-          <ResourceBar label="CPU" pct={res.cpuUsage} detail={`${res.cpuUsage}%`} />
+      <div className="mb-1 mr-1 flex items-center gap-3 rounded-md border border-white/10 bg-black/45 px-3 py-2 text-[var(--text)] backdrop-blur-sm">
+        <ResourceBar label="CPU" pct={res.cpuUsage} detail={`${res.cpuUsage}%`} />
+        <ResourceBar
+          label="RAM"
+          pct={(res.ramUsed / res.ramTotal) * 100}
+          detail={`${fmtBytes(res.ramUsed)} / ${fmtBytes(res.ramTotal)}`}
+        />
+        {hasGpu && (
+          <ResourceBar label="GPU" pct={res.gpuUsage!} detail={`${res.gpuUsage}%`} />
+        )}
+        {hasVram && (
           <ResourceBar
-            label="RAM"
-            pct={(res.ramUsed / res.ramTotal) * 100}
-            detail={`${fmtBytes(res.ramUsed)} / ${fmtBytes(res.ramTotal)}`}
+            label="VRAM"
+            pct={(res.vramUsed! / res.vramTotal!) * 100}
+            detail={`${fmtMb(res.vramUsed!)} / ${fmtMb(res.vramTotal!)}`}
           />
-          {hasGpu && (
-            <ResourceBar label="GPU" pct={res.gpuUsage!} detail={`${res.gpuUsage}%`} />
-          )}
-          {hasVram && (
-            <ResourceBar
-              label="VRAM"
-              pct={(res.vramUsed! / res.vramTotal!) * 100}
-              detail={`${fmtMb(res.vramUsed!)} / ${fmtMb(res.vramTotal!)}`}
-            />
-          )}
-        </div>
+        )}
       </div>
     </Panel>
   )
