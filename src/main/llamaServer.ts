@@ -20,7 +20,7 @@ export class LlamaServerManager {
 
   constructor() {
     this.rootDir = resolveAppRoot()
-    this.serverPath = join(this.rootDir, 'bin', 'llama-server', 'llama-b8664-bin-win-cuda-13.1-x64', 'llama-server.exe')
+    this.serverPath = resolveLlamaServerPath(this.rootDir)
     this.modelsDir = join(this.rootDir, 'models')
     this.settings = this.buildSettings(findDefaultModel(this.listModels()))
   }
@@ -270,6 +270,55 @@ function findMmprojForModel(modelPath: string): string | null {
     .filter((file) => /mmproj/i.test(basename(file)))
     .sort((left, right) => basename(left).localeCompare(basename(right)))
   return mmprojFiles[0] ?? null
+}
+
+function resolveLlamaServerPath(rootDir: string): string {
+  const serverRoot = join(rootDir, 'bin', 'llama-server')
+  if (!existsSync(serverRoot)) {
+    throw new Error(`llama-server directory was not found: ${serverRoot}`)
+  }
+
+  const directPath = join(serverRoot, 'llama-server.exe')
+  const candidates = existsSync(directPath)
+    ? [directPath]
+    : []
+
+  for (const entry of readdirSync(serverRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const nestedPath = join(serverRoot, entry.name, 'llama-server.exe')
+    if (existsSync(nestedPath)) {
+      candidates.push(nestedPath)
+    }
+  }
+
+  if (candidates.length === 0) {
+    throw new Error(`llama-server.exe was not found under: ${serverRoot}`)
+  }
+
+  candidates.sort(compareServerCandidates)
+  return candidates[0]
+}
+
+function compareServerCandidates(left: string, right: string): number {
+  const leftScore = getServerCandidateScore(left)
+  const rightScore = getServerCandidateScore(right)
+
+  if (leftScore.build !== rightScore.build) {
+    return rightScore.build - leftScore.build
+  }
+  if (leftScore.mtimeMs !== rightScore.mtimeMs) {
+    return rightScore.mtimeMs - leftScore.mtimeMs
+  }
+  return left.localeCompare(right)
+}
+
+function getServerCandidateScore(serverPath: string): { build: number; mtimeMs: number } {
+  const parentDirName = basename(dirname(serverPath))
+  const buildMatch = parentDirName.match(/(?:^|[^0-9])b(\d+)(?:[^0-9]|$)/i)
+  return {
+    build: buildMatch ? Number.parseInt(buildMatch[1], 10) : -1,
+    mtimeMs: statSync(serverPath).mtimeMs
+  }
 }
 
 function walkFiles(dir: string): string[] {

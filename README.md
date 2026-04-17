@@ -51,7 +51,7 @@ npm run build
 
 - `models/<model-folder>/<model>.gguf`
 - 必要なら `models/<model-folder>/mmproj-*.gguf`
-- `bin/llama-server/.../llama-server.exe`
+- `bin/llama-server/llama-server.exe` または `bin/llama-server/<server-folder>/llama-server.exe`
 
 例:
 
@@ -63,6 +63,7 @@ models/
 ```
 
 `mmproj` が同じモデルフォルダ内に見つかると、画像入力を Vision モデルとして扱います。
+`bin/llama-server/` 配下に複数の `llama-server.exe` がある場合は、アプリが自動で候補を選びます。
 
 ## 基本的な使い方
 

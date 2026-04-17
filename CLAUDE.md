@@ -51,7 +51,7 @@ All nodes have one output handle on the right.
 
 ### LLM backend
 
-- `llamaServer.ts` spawns `bin/llama-server/llama-server.exe` as a subprocess
+- `llamaServer.ts` auto-selects and spawns a `llama-server.exe` found under `bin/llama-server/`
 - Models are `.gguf` files placed in the `models/` directory
 - Communicates via HTTP on localhost (default port 8080)
 - Streaming completions via `GenerationMeta` (tokens, speed, duration)
