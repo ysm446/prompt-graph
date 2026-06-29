@@ -9,7 +9,7 @@
 - **マイルストーン1（プロンプト合成）+ llama.cpp インストーラの土台を実装・動作確認まで完了。**
   - スキャフォールド: Electron + electron-vite + React 19 + @xyflow/react + TS + Tailwind。
   - main: `llamaInstaller.ts`（lm-graph 流用、GitHub Releases→DL→tar 展開）、`llamaServer.ts`（モデル列挙/起動/ヘルスチェック）、`store.ts`（JSON 永続化）、IPC。
-  - renderer: 9 ノード型（Character/SoloAction/Interaction/Background/Lighting/Camera/Style/Seed/Scene）、zustand ストア、Scene コンパイル（収集→人数タグ→順序→weight→BREAK→positive/negative）、合成結果パネル、llama.cpp 管理パネル。
+  - renderer: 9 ノード型（Character/SoloAction/Interaction/Background/Lighting/Camera/Style/Seed/Scene）、zustand ストア、Scene コンパイル（収集→人数タグ→順序→weight→BREAK→positive）、合成結果パネル、llama.cpp 管理パネル。
   - 共有: `shared/types.ts`・`shared/compile.ts`・`shared/api.ts`・`shared/ipc.ts`。
   - 検証: `npm run typecheck` / `npm run build` / `npm run dev`（GUI 起動）すべて通過。
 

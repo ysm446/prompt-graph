@@ -11,7 +11,7 @@
 1. **プロンプト合成まで（最優先）**
    - ノードグラフ編集 UI（React Flow）。
    - ノード型: Character / Solo Action / Interaction / Background / Lighting / Camera / Style / Seed / Scene。
-   - Scene コンパイル = 素の合成（収集 → 順序 → weight → positive/negative）。可視性フィルタ・Forge・Dynamic Prompt は含めない。
+   - Scene コンパイル = 素の合成（収集 → 順序 → weight → positive）。negative プロンプトは使わない。可視性フィルタ・Forge・Dynamic Prompt は含めない。
    - プロジェクトの保存/読み込み（JSON）。
 2. **llama.cpp インストーラ/サーバ管理**
    - リリース取得・バリアント選択（CUDA/CPU/Vulkan…）・DL・展開・起動・ヘルスチェック。

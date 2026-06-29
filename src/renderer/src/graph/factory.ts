@@ -52,8 +52,7 @@ export function defaultData(kind: NodeKind): NodeData {
         label: 'Scene',
         peopleTagAuto: true,
         peopleTag: '',
-        useBreak: true,
-        negative: 'lowres, bad anatomy, bad hands, worst quality'
+        useBreak: true
       }
   }
 }

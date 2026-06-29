@@ -186,10 +186,9 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
   segments.push(...interactions, ...backgrounds, ...lightings, ...styles)
 
   const positive = segments.filter(Boolean).join(', ').replace(/,\s*BREAK\s*,/g, ', BREAK, ')
-  const negative = scene?.negative.trim() ?? ''
 
   if (characterBlocks.length === 0) warnings.push('Character が1つも接続されていません')
   if (characterBlocks.length > 2) warnings.push('キャラは最大2人を想定（3人以上はスコープ外）')
 
-  return { sceneId: sceneNode.id, positive, negative, seed, warnings }
+  return { sceneId: sceneNode.id, positive, seed, warnings }
 }

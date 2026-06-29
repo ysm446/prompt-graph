@@ -55,7 +55,6 @@ export type SceneData = {
   peopleTagAuto: boolean // 人数タグ（2girls 等）を自動付与するか
   peopleTag: string // 手動指定（auto が false のとき使用）
   useBreak: boolean // 複数キャラブロックを BREAK で分割（spec §6）
-  negative: string // negative プロンプト
 }
 
 export type NodeData =
@@ -103,7 +102,6 @@ export interface AppSettings {
 export interface CompiledScene {
   sceneId: string
   positive: string
-  negative: string
   seed: string | null
   warnings: string[]
 }

@@ -59,19 +59,6 @@ export function CompilePanel() {
             {result.positive || '(空)'}
           </pre>
 
-          <div className="mb-1 mt-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase text-[#565f89]">negative</span>
-            <button
-              className="text-[10px] text-[#7aa2f7] hover:underline"
-              onClick={() => copy(result.negative, `${scene.id}-neg`)}
-            >
-              {copied === `${scene.id}-neg` ? 'copied!' : 'copy'}
-            </button>
-          </div>
-          <pre className="whitespace-pre-wrap break-words rounded bg-[#11131a] p-2 text-[11px] text-[#f7768e]">
-            {result.negative || '(空)'}
-          </pre>
-
           {result.warnings.length > 0 && (
             <ul className="mt-2 list-disc pl-4 text-[10px] text-[#e0af68]">
               {result.warnings.map((w, i) => (

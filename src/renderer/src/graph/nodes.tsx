@@ -260,9 +260,6 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
         />
         複数キャラを BREAK で分割
       </label>
-      <Field label="negative">
-        <Area value={d.negative} onChange={(v) => update({ negative: v })} rows={2} />
-      </Field>
     </Shell>
   )
 }
