@@ -55,8 +55,8 @@ export function CompilePanel() {
               {copied === `${scene.id}-pos` ? 'copied!' : 'copy'}
             </button>
           </div>
-          <pre className="whitespace-pre-wrap break-words rounded bg-[#11131a] p-2 text-[11px] text-[#9ece6a]">
-            {result.positive || '(空)'}
+          <pre className="whitespace-pre-wrap break-words rounded bg-[#11131a] p-2 text-[11px] leading-relaxed text-[#9ece6a]">
+            {result.positivePretty || '(空)'}
           </pre>
 
           {result.warnings.length > 0 && (

@@ -122,6 +122,20 @@ function aggregatePeopleTag(persons: string[]): string | null {
   return tags.length > 0 ? tags.join(', ') : null
 }
 
+/** 表示用に各パートを1行空けて連結する（BREAK はカンマなしで独立行）。 */
+function buildPretty(segments: string[]): string {
+  let out = ''
+  for (const s of segments) {
+    if (!out) {
+      out = s
+      continue
+    }
+    if (s === 'BREAK' || out.endsWith('BREAK')) out += `\n\n${s}`
+    else out += `,\n\n${s}`
+  }
+  return out
+}
+
 /** 単一 Scene をコンパイルする。 */
 export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: GraphEdge[]): CompiledScene {
   const g = buildGraph(nodes, edges)
@@ -223,10 +237,14 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
 
   segments.push(...interactions, ...backgrounds, ...lightings, ...styles)
 
-  const positive = segments.filter(Boolean).join(', ').replace(/,\s*BREAK\s*,/g, ', BREAK, ')
+  const clean = segments.filter(Boolean)
+  // コピー用: 1 行のクリーンな形
+  const positive = clean.join(', ').replace(/,\s*BREAK\s*,/g, ', BREAK, ')
+  // 表示用: パートごとに 1 行空けて見やすく（SD は改行を無視するので意味は同じ）
+  const positivePretty = buildPretty(clean)
 
   if (characterBlocks.length === 0) warnings.push('Character が1つも接続されていません')
   if (characterBlocks.length > 2) warnings.push('キャラは最大2人を想定（3人以上はスコープ外）')
 
-  return { sceneId: sceneNode.id, positive, seed, warnings }
+  return { sceneId: sceneNode.id, positive, positivePretty, seed, warnings }
 }

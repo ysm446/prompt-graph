@@ -115,7 +115,8 @@ export interface AppSettings {
 
 export interface CompiledScene {
   sceneId: string
-  positive: string
+  positive: string // コピー用（1 行）
+  positivePretty: string // 表示用（パートごとに空行区切り）
   seed: string | null
   warnings: string[]
 }
