@@ -55,6 +55,7 @@ export function defaultData(kind: NodeKind): NodeData {
         kind,
         label: 'Scene',
         peopleTagAuto: true,
+        peoplePerCharacter: true,
         peopleTag: '',
         useBreak: true
       }

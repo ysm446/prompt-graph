@@ -144,8 +144,7 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
   const ups = (g.incomers.get(sceneNode.id) ?? []).map((id) => g.nodes.get(id)!).filter(Boolean)
 
   // --- 収集 ---
-  const characterBlocks: string[] = []
-  const persons: string[] = []
+  const characterEntries: Array<{ block: string; person?: string }> = []
   const qualities: string[] = []
   const interactions: string[] = []
   const backgrounds: string[] = []
@@ -160,8 +159,7 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
         const r = resolveCharacterChain(up.id, g)
         if (r) {
           if (r.warning) warnings.push(r.warning)
-          if (r.block) characterBlocks.push(r.block)
-          if (r.person) persons.push(r.person)
+          if (r.block || r.person) characterEntries.push({ block: r.block, person: r.person })
         }
         break
       }
@@ -212,27 +210,39 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
     }
   }
 
-  // --- 人数タグ（spec §6）: キャラの種別を集計して 2girls / 1girl, 1boy などにする ---
-  let peopleTag: string | null = null
-  if (scene) {
-    if (scene.peopleTagAuto) peopleTag = aggregatePeopleTag(persons)
-    else peopleTag = scene.peopleTag.trim() || null
+  // --- 人数タグ（spec §6） ---
+  const auto = scene?.peopleTagAuto ?? true
+  const perCharacter = scene?.peoplePerCharacter ?? true
+  const persons = characterEntries.map((e) => e.person).filter((p): p is string => !!p)
+
+  // perCharacter（自動＋各キャラ直前）のときは、各ブロック先頭に 1<noun> を付ける
+  const interleavePeople = auto && perCharacter
+  const charBlocks = characterEntries.map((e) => {
+    if (!interleavePeople) return e.block
+    const noun = (e.person ?? '').trim().toLowerCase()
+    return [noun ? `1${noun}` : '', e.block].filter(Boolean).join(', ')
+  })
+
+  // 先頭にまとめる人数タグ（perCharacter のときは付けない）
+  let frontPeopleTag: string | null = null
+  if (!interleavePeople) {
+    frontPeopleTag = auto ? aggregatePeopleTag(persons) : scene?.peopleTag.trim() || null
   }
 
   // --- 順序づけ（spec §5-5）: quality(先頭) → 人数 → キャラ各ブロック → interaction → background → lighting → style ---
   const useBreak = scene?.useBreak ?? false
   const segments: string[] = []
   segments.push(...qualities) // 品質タグはプロンプト先頭（効きを最大化）
-  if (peopleTag) segments.push(peopleTag)
+  if (frontPeopleTag) segments.push(frontPeopleTag)
 
-  if (useBreak && characterBlocks.length > 1) {
+  if (useBreak && charBlocks.length > 1) {
     // キャラブロックを BREAK で CLIP チャンク分割（特徴の混ざり軽減）
-    characterBlocks.forEach((b, i) => {
+    charBlocks.forEach((b, i) => {
       if (i > 0) segments.push('BREAK')
       segments.push(b)
     })
   } else {
-    segments.push(...characterBlocks)
+    segments.push(...charBlocks)
   }
 
   segments.push(...interactions, ...backgrounds, ...lightings, ...styles)
@@ -243,8 +253,8 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
   // 表示用: パートごとに 1 行空けて見やすく（SD は改行を無視するので意味は同じ）
   const positivePretty = buildPretty(clean)
 
-  if (characterBlocks.length === 0) warnings.push('Character が1つも接続されていません')
-  if (characterBlocks.length > 2) warnings.push('キャラは最大2人を想定（3人以上はスコープ外）')
+  if (characterEntries.length === 0) warnings.push('Character が1つも接続されていません')
+  if (characterEntries.length > 2) warnings.push('キャラは最大2人を想定（3人以上はスコープ外）')
 
   return { sceneId: sceneNode.id, positive, positivePretty, seed, warnings }
 }

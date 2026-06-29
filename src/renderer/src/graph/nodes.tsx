@@ -258,7 +258,17 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
         />
         人数タグを自動付与
       </label>
-      {!d.peopleTagAuto && (
+      {d.peopleTagAuto ? (
+        <label className="flex items-center gap-2 pl-4 text-[10px] text-[#565f89]">
+          <input
+            type="checkbox"
+            className="nodrag"
+            checked={d.peoplePerCharacter ?? true}
+            onChange={(e) => update({ peoplePerCharacter: e.target.checked })}
+          />
+          各キャラ直前に付ける（1girl, …, 1boy, …）
+        </label>
+      ) : (
         <Field label="人数タグ">
           <TextInput value={d.peopleTag} onChange={(v) => update({ peopleTag: v })} placeholder="1girl, 1boy" />
         </Field>

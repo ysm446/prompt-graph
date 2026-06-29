@@ -172,7 +172,9 @@
 - 対象は最大2人（3人以上は現状スコープ外）。
 - 単一プロンプトで合成する。グラフ構造（girl/guy の鎖、interaction の共通配置）は変えない。
 - 緩和策（プロンプトのみ）:
-  - 人数タグ（`2girls` / `1girl, 1boy` 等）。
+  - 人数タグ（`2girls` / `1girl, 1boy` 等）。置き方は Scene で選択:
+    - 各キャラ直前（既定）: `1girl, 女性の特徴, 1boy, 少年の特徴 …`。数と特徴を結びつけ、混ざりを軽減（BREAK と相性が良い）。
+    - 先頭にまとめる: `2girls, 1boy, …`。Danbooru の集計タグ分布に近い。
   - 位置ヒント（`on the left` / `on the right`）。
   - `BREAK` でキャラブロックを CLIP チャンク分割し、特徴の混ざりを軽減。
   - interaction・background・lighting・style は共通部分に置く。

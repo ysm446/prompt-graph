@@ -57,7 +57,11 @@ export type SeedData = {
 export type SceneData = {
   label: string
   peopleTagAuto: boolean // 人数タグ（2girls 等）を自動付与するか
-  peopleTag: string // 手動指定（auto が false のとき使用）
+  // 自動付与時の置き方:
+  //   true  = 各キャラ直前（1girl, 特徴, 1boy, 特徴 …）
+  //   false = 先頭にまとめる（2girls, 1boy, 特徴 …）
+  peoplePerCharacter: boolean
+  peopleTag: string // 手動指定（auto が false のとき使用、常に先頭）
   useBreak: boolean // 複数キャラブロックを BREAK で分割（spec §6）
 }
 
