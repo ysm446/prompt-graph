@@ -21,6 +21,7 @@ export function SettingsPanel() {
   async function save() {
     if (!settings) return
     await window.api.saveSettings(settings)
+    window.dispatchEvent(new Event('pg-settings')) // モニタ等へ反映
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
   }
@@ -28,6 +29,16 @@ export function SettingsPanel() {
   return (
     <div className="flex w-96 flex-col gap-2 text-xs text-[#c0caf5]">
       <div className="font-semibold text-[#7aa2f7]">設定</div>
+
+      <label className="flex items-center gap-2 text-[11px] text-[#c0caf5]">
+        <input
+          type="checkbox"
+          checked={settings.showResources}
+          onChange={(e) => update({ showResources: e.target.checked })}
+        />
+        システムリソースを表示（CPU / RAM / GPU）
+      </label>
+      <div className="h-px bg-[#2a2e3f]" />
 
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wide text-[#565f89]">

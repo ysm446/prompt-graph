@@ -155,6 +155,14 @@ export interface AppSettings {
   selectedModelPath: string | null
   contextSize: number
   visibilityPrompt: string // 可視性フィルタのシステムプロンプト（編集可）
+  showResources: boolean // システムリソース表示のオンオフ
+}
+
+export interface SystemResources {
+  cpu: number // 使用率 %
+  memUsed: number // bytes
+  memTotal: number // bytes
+  gpu: { util: number; memUsed: number; memTotal: number } | null // util %, VRAM MB
 }
 
 // ============================================================

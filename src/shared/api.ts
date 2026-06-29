@@ -10,6 +10,7 @@ import type {
   LlamaServerStatus,
   ProjectSnapshot,
   ReferenceBuckets,
+  SystemResources,
   WorkspaceMeta
 } from './types'
 
@@ -46,6 +47,7 @@ export interface PromptGraphApi {
   decompose(positive: string): Promise<ReferenceBuckets>
   openImageDialog(): Promise<string | null>
   imageMetadata(path: string): Promise<ImageMetadata>
+  getSystemResources(): Promise<SystemResources>
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void
   onServerStatus(cb: (s: LlamaServerStatus) => void): () => void

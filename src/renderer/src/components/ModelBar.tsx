@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
 import { RuntimeInstall } from './RuntimeInstall'
 import { SettingsPanel } from './SettingsPanel'
+import { SystemResourceMonitor } from './SystemResourceMonitor'
 
 const STATE_COLOR: Record<LlamaServerStatus['state'], string> = {
   running: '#9ece6a',
@@ -93,8 +94,10 @@ export function ModelBar() {
 
   return (
     <header className="relative z-30 flex h-12 items-center gap-3 border-b border-[#2a2e3f] bg-[#16171f] px-4 text-xs text-[#c0caf5]">
-      {/* left: 中央寄せのための空スペーサー（右の runtime と均等幅） */}
-      <div className="flex-1" />
+      {/* left: システムリソース表示（中央寄せのためのスペーサーも兼ねる） */}
+      <div className="flex flex-1 items-center">
+        <SystemResourceMonitor />
+      </div>
 
       {/* center: モデル選択バー */}
       <div className="flex items-center gap-3">

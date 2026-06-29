@@ -11,6 +11,7 @@ import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
 import { runDecompose, runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
 import { readImageMetadata } from './pngMeta'
+import { getResources } from './systemInfo'
 import { Store } from './store'
 
 // 開発時はリポジトリ直下、パッケージ時は userData を基準にする
@@ -147,6 +148,8 @@ function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.imageMetadata, (_e, path: string) => readImageMetadata(path))
+
+  ipcMain.handle(IPC.systemResources, () => getResources())
 }
 
 app.whenReady().then(() => {

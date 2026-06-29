@@ -1,5 +1,5 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
 import { getVisibilityInput, visibilityHash } from '@shared/compile'
 import { dryRun, findSceneForBatch, type DryRunResult } from '@shared/batch'
@@ -137,6 +137,27 @@ function Area(props: { value: string; onChange: (v: string) => void; rows?: numb
   )
 }
 
+// 内容に合わせて高さが自動で伸びる textarea（内部スクロールバーを出さない）
+function AutoArea(props: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [props.value])
+  return (
+    <textarea
+      ref={ref}
+      className={`${inputCls} resize-none overflow-hidden`}
+      rows={1}
+      value={props.value}
+      placeholder={props.placeholder}
+      onChange={(e) => props.onChange(e.target.value)}
+    />
+  )
+}
+
 function WeightInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
     <input
@@ -228,7 +249,7 @@ export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
   return (
     <Shell id={id} kind="camera" title={`🎥 ${d.label}`} selected={selected}>
       <Field label="presets (1行=1プリセット)">
-        <Area value={d.presets} onChange={(v) => update({ presets: v })} rows={3} />
+        <AutoArea value={d.presets} onChange={(v) => update({ presets: v })} />
       </Field>
       <Field label="使用プリセット">
         <select
