@@ -18,7 +18,7 @@ import type {
   ProjectSnapshot,
   WorkspaceMeta
 } from '@shared/types'
-import { createNode, scenePinForKind } from '../graph/factory'
+import { createNode, scenePinForKind, DEFAULT_NODE_WIDTH } from '../graph/factory'
 
 export type RFNode = Node<NodeData, NodeKind>
 
@@ -55,7 +55,14 @@ interface GraphState {
 }
 
 function toRFNode(n: GraphNode): RFNode {
-  return { id: n.id, type: n.kind, position: n.position, data: n.data }
+  return {
+    id: n.id,
+    type: n.kind,
+    position: n.position,
+    data: n.data,
+    width: n.width ?? DEFAULT_NODE_WIDTH[n.kind], // 旧データは既定幅で補完
+    ...(n.height ? { height: n.height } : {})
+  }
 }
 
 function snapshotOf(state: GraphState): ProjectSnapshot | null {
@@ -68,7 +75,9 @@ function snapshotOf(state: GraphState): ProjectSnapshot | null {
       id: n.id,
       kind: n.type as NodeKind,
       position: n.position,
-      data: n.data
+      data: n.data,
+      width: n.width ?? n.measured?.width,
+      height: n.height
     })),
     edges: state.edges.map<GraphEdge>((e) => ({
       id: e.id,

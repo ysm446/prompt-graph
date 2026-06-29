@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, NodeResizeControl, Position, type NodeProps } from '@xyflow/react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
 import { getVisibilityInput, visibilityHash } from '@shared/compile'
@@ -66,20 +66,24 @@ function Shell({
   const accent = ACCENT[kind]
   return (
     <div
-      className="rounded-lg border bg-[#1a1b26] text-[#c0caf5] shadow-lg"
+      className="flex h-full w-full flex-col overflow-hidden rounded-lg border bg-[#1a1b26] text-[#c0caf5] shadow-lg"
       style={{
         borderColor: selected ? accent : '#2a2e3f',
-        width: 240,
         boxShadow: selected ? `0 0 0 1px ${accent}` : undefined
       }}
     >
+      {/* 右下コーナーで縦横リサイズ（選択中のみ表示）。
+          高さ未指定なら内容に追従、縮めた場合のみ本文がスクロール。 */}
+      {selected && (
+        <NodeResizeControl position="bottom-right" minWidth={180} minHeight={80} maxWidth={680} />
+      )}
       <div
-        className="rounded-t-lg px-3 py-1.5 text-xs font-semibold tracking-wide"
+        className="shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-semibold tracking-wide"
         style={{ background: accent, color: '#11131a' }}
       >
         {title}
       </div>
-      <div className="flex flex-col gap-2 p-3">{children}</div>
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">{children}</div>
 
       {(inputs ?? []).map((h) => (
         <Handle

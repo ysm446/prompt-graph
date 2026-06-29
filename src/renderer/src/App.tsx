@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
-  Controls,
   MiniMap,
   Panel,
   ReactFlow,
@@ -17,6 +16,7 @@ import { useGraphStore } from './store/graphStore'
 import { CompilePanel } from './components/CompilePanel'
 import { ModelBar } from './components/ModelBar'
 import { WorkspacePanel } from './components/WorkspacePanel'
+import { SystemResourceMonitor } from './components/SystemResourceMonitor'
 
 const ADD_ORDER: NodeKind[] = [
   'character',
@@ -171,8 +171,14 @@ function Canvas() {
           <AddNodePanel />
         </Panel>
         <Background color="#2a2e3f" gap={20} />
-        <Controls />
-        <MiniMap pannable zoomable className="!bg-[#1a1b26]" />
+        <MiniMap
+          pannable
+          zoomable
+          bgColor="#16171f"
+          maskColor="rgba(15,17,21,0.6)"
+          nodeColor="#2a2e3f"
+          nodeStrokeColor="#3a3f55"
+        />
       </ReactFlow>
 
       {menu && (
@@ -259,6 +265,10 @@ export default function App() {
             <CompilePanel />
           </aside>
         </div>
+        {/* 下部ステータスバー（右端にシステムリソース） */}
+        <footer className="flex h-6 shrink-0 items-center justify-end border-t border-[#2a2e3f] bg-[#16171f] px-3">
+          <SystemResourceMonitor />
+        </footer>
       </div>
     </ReactFlowProvider>
   )

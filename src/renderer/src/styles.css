@@ -36,3 +36,15 @@ body,
 .react-flow__handle:hover {
   box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.5);
 }
+
+/* ノードのリサイズ（右下コーナー）。選択中のみ表示。 */
+.react-flow__resize-control.handle {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: #3a3f55;
+  border: 1px solid #1a1b26;
+}
+.react-flow__resize-control.handle:hover {
+  background: #7aa2f7;
+}

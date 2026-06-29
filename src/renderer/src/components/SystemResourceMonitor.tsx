@@ -57,7 +57,7 @@ export function SystemResourceMonitor() {
   const memPct = res.memTotal > 0 ? Math.round((res.memUsed / res.memTotal) * 100) : 0
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex items-center gap-3">
       <Bar label="CPU" percent={res.cpu} detail={`${res.cpu}%`} />
       <Bar label="RAM" percent={memPct} detail={`${gb(res.memUsed)}/${gb(res.memTotal)} GB`} />
       {res.gpu && (

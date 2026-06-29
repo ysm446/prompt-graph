@@ -40,6 +40,22 @@ export function scenePinForKind(kind: NodeKind): string | null {
   return SCENE_INPUTS.find((p) => p.kinds.includes(kind))?.id ?? null
 }
 
+// ノード種別ごとの既定の横幅（px）。リサイズで変更でき、保存される。
+export const DEFAULT_NODE_WIDTH: Record<NodeKind, number> = {
+  character: 240,
+  soloAction: 240,
+  interaction: 240,
+  background: 240,
+  lighting: 240,
+  camera: 240,
+  quality: 240,
+  style: 240,
+  seed: 240,
+  reference: 340,
+  scene: 270,
+  batch: 320
+}
+
 export function defaultData(kind: NodeKind): NodeData {
   switch (kind) {
     case 'character':
@@ -113,5 +129,5 @@ export function defaultData(kind: NodeKind): NodeData {
 }
 
 export function createNode(kind: NodeKind, position: { x: number; y: number }): GraphNode {
-  return { id: nanoid(8), kind, position, data: defaultData(kind) }
+  return { id: nanoid(8), kind, position, data: defaultData(kind), width: DEFAULT_NODE_WIDTH[kind] }
 }

@@ -129,6 +129,8 @@ export interface GraphNode {
   kind: NodeKind
   position: { x: number; y: number }
   data: NodeData
+  width?: number // ノードの横幅（リサイズで変更・永続化）。高さは内容に追従。
+  height?: number
 }
 
 export interface GraphEdge {
