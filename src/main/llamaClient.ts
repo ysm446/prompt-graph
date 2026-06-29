@@ -2,6 +2,14 @@
 // 可視性フィルタ（画面外タグの判定）と参照プロンプト分解に使用。
 import type { ReferenceBuckets } from '../shared/types'
 
+/** 思考（reasoning）出力を除去する。思考対応モデルが <think>…</think> を出しても無害化。 */
+function stripThinking(s: string): string {
+  let out = s.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  const idx = out.lastIndexOf('</think>') // 途中で切れた思考が残った場合の保険
+  if (idx >= 0) out = out.slice(idx + '</think>'.length)
+  return out.trim()
+}
+
 async function chat(baseUrl: string, system: string, user: string, maxTokens: number): Promise<string> {
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
@@ -13,12 +21,15 @@ async function chat(baseUrl: string, system: string, user: string, maxTokens: nu
       ],
       temperature: 0,
       max_tokens: maxTokens,
-      stream: false
+      stream: false,
+      // 思考モードをオフに（対応モデル向け。非対応モデルでは無視される）
+      reasoning_budget: 0,
+      chat_template_kwargs: { enable_thinking: false }
     })
   })
   if (!res.ok) throw new Error(`LLM request failed: ${res.status}`)
   const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
-  return data.choices?.[0]?.message?.content ?? ''
+  return stripThinking(data.choices?.[0]?.message?.content ?? '')
 }
 
 const SYSTEM_PROMPT = `You decide which Danbooru-style tags depict things that would NOT be visible in the frame, given a camera framing, so they can be removed from a text-to-image prompt.
