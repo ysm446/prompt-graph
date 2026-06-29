@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { NodeData, NodeKind } from '@shared/types'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
+import { SCENE_INPUTS } from './factory'
 
 const ACCENT: Record<NodeKind, string> = {
   character: '#7aa2f7',
@@ -238,17 +239,24 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
   return (
-    <Shell
-      id={id}
-      kind="scene"
-      title={`🎬 ${d.label}`}
-      selected={selected}
-      hasOutput={false}
-      inputs={[{ id: 'in', label: 'inputs', top: 36 }]}
-    >
-      <p className="text-[10px] text-[#565f89]">
-        ← キャラ鎖 / interaction / background / lighting / style / camera / seed を接続
-      </p>
+    <Shell id={id} kind="scene" title={`🎬 ${d.label}`} selected={selected} hasOutput={false}>
+      {/* カテゴリ別入力ピン（誤接続防止 + 見やすさ） */}
+      <div className="-mx-3 mb-1 border-b border-[#2a2e3f] pb-1">
+        {SCENE_INPUTS.map((pin) => (
+          <div
+            key={pin.id}
+            className="relative flex h-[22px] items-center pl-3 text-[10px] text-[#565f89]"
+          >
+            <Handle
+              id={pin.id}
+              type="target"
+              position={Position.Left}
+              style={{ background: ACCENT.scene }}
+            />
+            {pin.label}
+          </div>
+        ))}
+      </div>
       <label className="flex items-center gap-2 text-[10px] text-[#565f89]">
         <input
           type="checkbox"

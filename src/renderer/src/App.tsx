@@ -12,7 +12,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import type { NodeKind } from '@shared/types'
 import { nodeTypes } from './graph/nodes'
-import { NODE_LABELS } from './graph/factory'
+import { NODE_LABELS, SCENE_INPUTS } from './graph/factory'
 import { useGraphStore } from './store/graphStore'
 import { CompilePanel } from './components/CompilePanel'
 import { ModelBar } from './components/ModelBar'
@@ -106,6 +106,26 @@ function Canvas() {
     [screenToFlowPosition]
   )
 
+  // ピンの種別に合わない接続を弾く（誤接続防止）
+  const isValidConnection = useCallback(
+    (c: { source: string | null; target: string | null; targetHandle?: string | null }) => {
+      const all = useGraphStore.getState().nodes
+      const source = all.find((n) => n.id === c.source)
+      const target = all.find((n) => n.id === c.target)
+      if (!source || !target) return true
+      if (target.type === 'scene') {
+        const pin = SCENE_INPUTS.find((p) => p.id === c.targetHandle)
+        return pin ? pin.kinds.includes(source.type as NodeKind) : true
+      }
+      // soloAction の charIn は Character のみ
+      if (target.type === 'soloAction' && c.targetHandle === 'charIn') {
+        return source.type === 'character'
+      }
+      return true
+    },
+    []
+  )
+
   const onNodeContextMenu = useCallback((e: ReactMouseEvent, node: { id: string }) => {
     e.preventDefault()
     const data = useGraphStore.getState().nodes.find((n) => n.id === node.id)?.data
@@ -135,6 +155,7 @@ function Canvas() {
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={closeMenu}
         onMoveStart={closeMenu}
+        isValidConnection={isValidConnection}
         fitView
         deleteKeyCode={['Delete', 'Backspace']}
         connectionRadius={45}

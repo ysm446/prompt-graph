@@ -18,7 +18,7 @@ import type {
   ProjectSnapshot,
   WorkspaceMeta
 } from '@shared/types'
-import { createNode } from '../graph/factory'
+import { createNode, scenePinForKind } from '../graph/factory'
 
 export type RFNode = Node<NodeData, NodeKind>
 
@@ -81,17 +81,27 @@ function snapshotOf(state: GraphState): ProjectSnapshot | null {
 }
 
 function applySnapshot(snap: ProjectSnapshot): Partial<GraphState> {
+  // 旧データ（Scene の単一 'in' ピン）を新しいカテゴリ別ピンへ移行
+  const kindById = new Map(snap.nodes.map((n) => [n.id, n.kind]))
   return {
     activeId: snap.id,
     name: snap.name,
     nodes: snap.nodes.map(toRFNode),
-    edges: snap.edges.map((e) => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle ?? null,
-      targetHandle: e.targetHandle ?? null
-    })),
+    edges: snap.edges.map((e) => {
+      let targetHandle = e.targetHandle ?? null
+      if (kindById.get(e.target) === 'scene') {
+        const srcKind = kindById.get(e.source)
+        const pin = srcKind ? scenePinForKind(srcKind) : null
+        if (pin) targetHandle = pin
+      }
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle ?? null,
+        targetHandle
+      }
+    }),
     selectedId: null,
     dirty: false
   }

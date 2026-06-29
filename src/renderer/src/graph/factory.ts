@@ -14,6 +14,30 @@ export const NODE_LABELS: Record<NodeKind, string> = {
   scene: 'Scene'
 }
 
+// Scene のカテゴリ別入力ピン。id はエッジの targetHandle に対応。
+// kinds = そのピンに接続できるノード種別（誤接続防止に使う）。
+export interface ScenePin {
+  id: string
+  label: string
+  kinds: NodeKind[]
+}
+
+export const SCENE_INPUTS: ScenePin[] = [
+  { id: 'chars', label: 'Character / Action', kinds: ['character', 'soloAction'] },
+  { id: 'interaction', label: 'Interaction', kinds: ['interaction'] },
+  { id: 'background', label: 'Background', kinds: ['background'] },
+  { id: 'lighting', label: 'Lighting', kinds: ['lighting'] },
+  { id: 'quality', label: 'Quality', kinds: ['quality'] },
+  { id: 'style', label: 'Style', kinds: ['style'] },
+  { id: 'camera', label: 'Camera', kinds: ['camera'] },
+  { id: 'seed', label: 'Seed', kinds: ['seed'] }
+]
+
+/** ノード種別から対応する Scene 入力ピン id を返す。 */
+export function scenePinForKind(kind: NodeKind): string | null {
+  return SCENE_INPUTS.find((p) => p.kinds.includes(kind))?.id ?? null
+}
+
 export function defaultData(kind: NodeKind): NodeData {
   switch (kind) {
     case 'character':
