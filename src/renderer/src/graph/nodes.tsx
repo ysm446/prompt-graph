@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
 import { getVisibilityInput, visibilityHash } from '@shared/compile'
+import { dryRun, findSceneForBatch, type DryRunResult } from '@shared/batch'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
 import { SCENE_INPUTS } from './factory'
@@ -16,11 +17,33 @@ const ACCENT: Record<NodeKind, string> = {
   quality: '#f7c873',
   style: '#73daca',
   seed: '#a9b1d6',
-  scene: '#ff9e64'
+  reference: '#7dcfff',
+  scene: '#ff9e64',
+  batch: '#f7768e'
 }
 
 function useUpdate(id: string) {
   return (patch: Partial<NodeData>) => useGraphStore.getState().updateNodeData(id, patch)
+}
+
+/** ストアの RFNode/Edge を共有ロジック用の GraphNode/GraphEdge に変換。 */
+function storeGraph(): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const s = useGraphStore.getState()
+  return {
+    nodes: s.nodes.map((n) => ({
+      id: n.id,
+      kind: n.type as NodeKind,
+      position: n.position,
+      data: n.data
+    })),
+    edges: s.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle ?? null,
+      targetHandle: e.targetHandle ?? null
+    }))
+  }
 }
 
 function Shell({
@@ -64,12 +87,12 @@ function Shell({
           id={h.id}
           type="target"
           position={Position.Left}
-          style={{ top: h.top, background: accent }}
+          style={{ top: h.top, backgroundColor: accent }}
           title={h.label}
         />
       ))}
       {hasOutput && (
-        <Handle id="out" type="source" position={Position.Right} style={{ background: accent }} />
+        <Handle id="out" type="source" position={Position.Right} style={{ backgroundColor: accent }} />
       )}
     </div>
   )
@@ -227,11 +250,49 @@ export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
 export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'seed' }>
   const update = useUpdate(id)
+  const mode = d.mode ?? 'fixed'
+  const numInput = (value: number, on: (n: number) => void) => (
+    <input
+      type="number"
+      className={`${inputCls} w-20`}
+      value={value}
+      onChange={(e) => on(Number(e.target.value) || 0)}
+    />
+  )
   return (
     <Shell id={id} kind="seed" title={`🎲 ${d.label}`} selected={selected}>
-      <Field label="seed (-1=ランダム)">
-        <TextInput value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
+      <Field label="モード">
+        <select
+          className={inputCls}
+          value={mode}
+          onChange={(e) => update({ mode: e.target.value as typeof d.mode })}
+        >
+          <option value="fixed">固定（1つ）</option>
+          <option value="increment">増加（+stepずつ）</option>
+          <option value="random">ランダム（-1×個数）</option>
+          <option value="list">リスト（カンマ区切り）</option>
+        </select>
       </Field>
+      {mode === 'fixed' && (
+        <Field label="seed (-1=ランダム)">
+          <TextInput value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
+        </Field>
+      )}
+      {mode === 'list' && (
+        <Field label="seed リスト">
+          <TextInput value={d.value} onChange={(v) => update({ value: v })} placeholder="1, 2, 3" />
+        </Field>
+      )}
+      {mode === 'increment' && (
+        <div className="flex gap-2">
+          <Field label="開始">{numInput(d.start ?? 0, (n) => update({ start: n }))}</Field>
+          <Field label="step">{numInput(d.step ?? 1, (n) => update({ step: n }))}</Field>
+          <Field label="個数">{numInput(d.count ?? 4, (n) => update({ count: n }))}</Field>
+        </div>
+      )}
+      {mode === 'random' && (
+        <Field label="個数">{numInput(d.count ?? 4, (n) => update({ count: n }))}</Field>
+      )}
     </Shell>
   )
 }
@@ -354,7 +415,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
   return (
-    <Shell id={id} kind="scene" title={`🎬 ${d.label}`} selected={selected} hasOutput={false}>
+    <Shell id={id} kind="scene" title={`🎬 ${d.label}`} selected={selected}>
       {/* カテゴリ別入力ピン（誤接続防止 + 見やすさ） */}
       <div className="-mx-3 mb-1 border-b border-[#2a2e3f] pb-1">
         {SCENE_INPUTS.map((pin) => (
@@ -366,7 +427,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
               id={pin.id}
               type="target"
               position={Position.Left}
-              style={{ background: ACCENT.scene }}
+              style={{ backgroundColor: ACCENT[pin.kinds[0]] }}
             />
             {pin.label}
           </div>
@@ -411,6 +472,193 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
+// Reference: 既存画像のメタデータ(プロンプト)を読み込み、バケツに分解（spec §4.9）
+const BUCKET_LABELS: Array<{ key: keyof Extract<NodeData, { kind: 'reference' }>['buckets']; label: string }> = [
+  { key: 'character', label: 'Character' },
+  { key: 'background', label: 'Background' },
+  { key: 'action', label: 'Action' },
+  { key: 'camera', label: 'Camera' },
+  { key: 'style', label: 'Style' }
+]
+
+export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
+  const d = data as Extract<NodeData, { kind: 'reference' }>
+  const update = useUpdate(id)
+  const [running, setRunning] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.api.getServerStatus().then((s) => setRunning(s.state === 'running'))
+    return window.api.onServerStatus((s) => setRunning(s.state === 'running'))
+  }, [])
+
+  async function load() {
+    setErr(null)
+    try {
+      const path = await window.api.openImageDialog()
+      if (!path) return
+      const meta = await window.api.imageMetadata(path)
+      update({
+        imagePath: path,
+        positive: meta.positive,
+        negative: meta.negative,
+        settings: meta.settings
+      })
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+  }
+
+  async function decompose() {
+    setErr(null)
+    setBusy(true)
+    try {
+      const buckets = await window.api.decompose(d.positive)
+      update({ buckets })
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fileName = d.imagePath ? d.imagePath.replace(/^.*[\\/]/, '') : ''
+
+  return (
+    <Shell id={id} kind="reference" title={`🖼️ ${d.label}`} selected={selected} hasOutput={false}>
+      <button
+        className="nodrag rounded bg-[#2a2e3f] py-1 text-xs hover:bg-[#3a3f55]"
+        onClick={load}
+      >
+        画像を読み込む
+      </button>
+      {fileName && <div className="truncate text-[10px] text-[#565f89]">{fileName}</div>}
+
+      <Field label="positive (抽出)">
+        <Area value={d.positive} onChange={(v) => update({ positive: v })} rows={3} />
+      </Field>
+
+      <div className="flex items-center gap-2">
+        <button
+          className="nodrag rounded bg-[#7dcfff] px-2 py-0.5 text-[10px] font-semibold text-[#11131a] hover:opacity-90 disabled:opacity-40"
+          onClick={decompose}
+          disabled={busy || !running || !d.positive.trim()}
+        >
+          {busy ? '分解中…' : 'バケツに分解'}
+        </button>
+        {!running && <span className="text-[10px] text-[#e0af68]">要モデルロード</span>}
+      </div>
+      {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+
+      {BUCKET_LABELS.map(({ key, label }) => (
+        <Field key={key} label={label}>
+          <Area
+            value={d.buckets?.[key] ?? ''}
+            onChange={(v) => update({ buckets: { ...d.buckets, [key]: v } })}
+            rows={1}
+          />
+        </Field>
+      ))}
+      <p className="text-[10px] text-[#565f89]">
+        ※ Scene スロットへの上書き接続は今後対応（現状は分解の確認・編集用）
+      </p>
+    </Shell>
+  )
+}
+
+// Batch: スイープ軸の直積・ドライラン（spec §4.12）
+export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
+  const d = data as Extract<NodeData, { kind: 'batch' }>
+  const update = useUpdate(id)
+  const [result, setResult] = useState<DryRunResult | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  function run() {
+    setErr(null)
+    const { nodes, edges } = storeGraph()
+    const scene = findSceneForBatch(id, nodes, edges)
+    if (!scene) {
+      setErr('Scene を接続してください')
+      setResult(null)
+      return
+    }
+    setResult(dryRun(d, scene, nodes, edges))
+  }
+
+  return (
+    <Shell
+      id={id}
+      kind="batch"
+      title={`📦 ${d.label}`}
+      selected={selected}
+      hasOutput={false}
+      inputs={[{ id: 'scene', label: 'Scene', top: 36 }]}
+    >
+      <p className="text-[10px] text-[#565f89]">← Scene を接続</p>
+      <Field label="展開モード">
+        <select
+          className={inputCls}
+          value={d.mode}
+          onChange={(e) => update({ mode: e.target.value as typeof d.mode })}
+        >
+          <option value="all">全列挙（直積）</option>
+          <option value="random">ランダム抽出</option>
+          <option value="fixed">固定（現在値）</option>
+        </select>
+      </Field>
+      {d.mode === 'random' && (
+        <Field label="抽出数">
+          <input
+            type="number"
+            className={`${inputCls} w-20`}
+            value={d.randomCount}
+            onChange={(e) => update({ randomCount: Number(e.target.value) || 1 })}
+          />
+        </Field>
+      )}
+      <Field label="サンプル表示数">
+        <input
+          type="number"
+          className={`${inputCls} w-20`}
+          value={d.sampleCount}
+          onChange={(e) => update({ sampleCount: Number(e.target.value) || 1 })}
+        />
+      </Field>
+
+      <button
+        className="nodrag rounded bg-[#f7768e] py-1 text-xs font-semibold text-[#11131a] hover:opacity-90"
+        onClick={run}
+      >
+        ドライラン
+      </button>
+      {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+
+      {result && (
+        <div className="flex flex-col gap-1 text-[10px] text-[#c0caf5]">
+          <div>
+            総数 <span className="text-[#ff9e64]">{result.total}</span> / 展開{' '}
+            <span className="text-[#9ece6a]">{result.planned}</span>
+          </div>
+          {result.axes.length === 0 ? (
+            <div className="text-[#565f89]">スイープ軸なし（Camera 複数プリセット / Seed 複数値で増えます）</div>
+          ) : (
+            <div className="text-[#565f89]">
+              軸: {result.axes.map((a) => `${a.label}×${a.count}`).join(', ')}
+            </div>
+          )}
+          {result.samples.map((s, i) => (
+            <div key={i} className="rounded bg-[#11131a] p-1">
+              <div className="text-[#7aa2f7]">{s.overridesLabel}</div>
+              <div className="whitespace-pre-wrap break-words text-[#9ece6a]">{s.positive}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Shell>
+  )
+}
+
 export const nodeTypes = {
   character: CharacterNode,
   soloAction: SoloActionNode,
@@ -421,5 +669,7 @@ export const nodeTypes = {
   quality: QualityNode,
   style: StyleNode,
   seed: SeedNode,
-  scene: SceneNode
+  reference: ReferenceNode,
+  scene: SceneNode,
+  batch: BatchNode
 }

@@ -20,18 +20,19 @@ body,
   background: #2a2e3f;
 }
 
-/* ピン（ハンドル）の当たり判定を拡大。
-   見た目のドットは小さいまま（背景は padding 内）、透明なボーダーで
-   クリック/ドラッグ可能領域を広げる。box-sizing: content-box で
-   中心位置を保ったまま全体サイズを大きくする。 */
+/* ピン（ハンドル）。見た目は小さいドットのまま。
+   当たり判定だけ ::before（透明な拡張領域）で広げる。
+   ハンドル本体のサイズは変えないので、エッジの接続点はドット中心と一致する。 */
 .react-flow__handle {
-  box-sizing: content-box;
-  width: 9px;
-  height: 9px;
-  border: 8px solid transparent !important;
-  background-clip: padding-box;
+  width: 7px;
+  height: 7px;
+}
+.react-flow__handle::before {
+  content: '';
+  position: absolute;
+  inset: -8px; /* 上下左右に 8px 拡張 → 実クリック領域 約23px */
+  border-radius: 9999px;
 }
 .react-flow__handle:hover {
-  background-clip: padding-box;
   box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.5);
 }

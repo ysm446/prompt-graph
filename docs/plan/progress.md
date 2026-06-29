@@ -2,6 +2,21 @@
 
 > 新しい記録を各セクションの上に追記する。日付は `YYYY-MM-DD`。
 
+## 2026-06-29 (Batch / Reference / Seed モード)
+
+- **Batch ノード**（spec §4.12）: Scene→Batch 接続。多値軸（Camera プリセット>1, Seed 値>1）の直積を計算し、**ドライラン**（総数・展開数・軸一覧・サンプルプロンプト）を表示。展開モード（全列挙/ランダム抽出/固定）。`shared/batch.ts`、`compileScene` に overrides 引数。実生成（Forge ジョブ発行）は後段。
+- **Seed ノードのモード**: fixed / increment（+step ずつ）/ random（-1×個数）/ list。`seedValues()` で値リスト化し、Batch の軸にもなる。
+- **Reference ノード**（spec §4.9, 一部）: 画像読込→**ローカルで A1111 メタデータ抽出**（`main/pngMeta.ts`、tEXt/iTXt、Forge 不要）→ positive 表示 → **LLM 分解**で 5 バケツ（character/background/action/camera/style、編集可）。`runDecompose`（llamaClient）。
+  - 当面スタンドアロン。**Scene スロットへの上書き接続（spec §8）は未対応**＝次段。
+- 追加 IPC: `llama:decompose` / `dialog:open-image` / `image:metadata`。Scene に出力ハンドル追加。Batch 入力は Scene のみ（誤接続防止）。
+- 検証: typecheck / build / 起動 OK。Batch ドライランは純ロジックで動作。LLM 分解は要モデルロード。
+
+## 2026-06-29 (Forge 連携は保留)
+
+- WebUI Forge 連携（接続/txt2img/png-info/ダウンローダ UI）は**保留**と決定。理由: 現在の開発機がノート PC で SD 生成を実行・デバッグできないため、作っても動作確認できない。Forge 未導入。
+- 参考にと言われた `ysm446/image-assistant` は非公開（404）で内容未確認。再開時に概要共有が必要。
+- 再開条件: SD を動かせる環境が用意できたら、まず「接続＋txt2img 生成」から着手予定。
+
 ## 2026-06-29 (可視性フィルタ)
 
 - 可視性フィルタ（spec §4.11）を実装。Scene ノード内に「実行」ボタンを配置。

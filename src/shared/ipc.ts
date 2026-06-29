@@ -18,6 +18,9 @@ export const IPC = {
   llamaStop: 'llama:stop',
   llamaStatus: 'llama:status',
   llamaVisibility: 'llama:visibility',
+  llamaDecompose: 'llama:decompose',
+  dialogOpenImage: 'dialog:open-image',
+  imageMetadata: 'image:metadata',
   // main -> renderer events
   evtInstallProgress: 'llama:install-progress',
   evtServerStatus: 'llama:server-status'

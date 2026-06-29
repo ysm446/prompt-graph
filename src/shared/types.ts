@@ -14,7 +14,9 @@ export type NodeKind =
   | 'quality'
   | 'style'
   | 'seed'
+  | 'reference'
   | 'scene'
+  | 'batch'
 
 // 注意: 以下のノード data 型は React Flow の Node<T extends Record<string, unknown>>
 // の制約を満たすため `type`（クローズドな型）で定義する。interface は宣言マージ可能
@@ -49,9 +51,44 @@ export type CameraData = {
   selected: number // 使用するプリセットの行インデックス
 }
 
+// seed の生成モード。Batch のスイープ軸にもなる。
+export type SeedMode = 'fixed' | 'increment' | 'random' | 'list'
+
 export type SeedData = {
   label: string
-  value: string // 単一またはカンマ区切り（スイープは後段）
+  mode: SeedMode
+  value: string // fixed: 単一値 / list: カンマ区切り（-1 でランダム）
+  start: number // increment: 開始値
+  step: number // increment: 加算幅
+  count: number // increment / random: 個数
+}
+
+// Reference: 既存画像のメタデータ(プロンプト)を読み込み、バケツに分解する。
+export type ReferenceBuckets = {
+  character: string
+  background: string
+  action: string
+  camera: string
+  style: string
+}
+
+export type ReferenceData = {
+  label: string
+  imagePath: string
+  positive: string
+  negative: string
+  settings: string
+  buckets: ReferenceBuckets
+}
+
+// Batch: スイープ軸の直積・ドライラン。
+export type BatchMode = 'all' | 'random' | 'fixed'
+
+export type BatchData = {
+  label: string
+  mode: BatchMode
+  randomCount: number
+  sampleCount: number
 }
 
 export type SceneData = {
@@ -79,7 +116,9 @@ export type NodeData =
   | ({ kind: 'style' } & TagData)
   | ({ kind: 'camera' } & CameraData)
   | ({ kind: 'seed' } & SeedData)
+  | ({ kind: 'reference' } & ReferenceData)
   | ({ kind: 'scene' } & SceneData)
+  | ({ kind: 'batch' } & BatchData)
 
 export interface GraphNode {
   id: string

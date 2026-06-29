@@ -11,7 +11,9 @@ export const NODE_LABELS: Record<NodeKind, string> = {
   quality: 'Quality',
   style: 'Style',
   seed: 'Seed',
-  scene: 'Scene'
+  reference: 'Reference',
+  scene: 'Scene',
+  batch: 'Batch'
 }
 
 // Scene のカテゴリ別入力ピン。id はエッジの targetHandle に対応。
@@ -73,7 +75,19 @@ export function defaultData(kind: NodeKind): NodeData {
         selected: 0
       }
     case 'seed':
-      return { kind, label: 'Seed', value: '-1' }
+      return { kind, label: 'Seed', mode: 'fixed', value: '-1', start: 0, step: 1, count: 4 }
+    case 'reference':
+      return {
+        kind,
+        label: 'Reference',
+        imagePath: '',
+        positive: '',
+        negative: '',
+        settings: '',
+        buckets: { character: '', background: '', action: '', camera: '', style: '' }
+      }
+    case 'batch':
+      return { kind, label: 'Batch', mode: 'all', randomCount: 8, sampleCount: 5 }
     case 'scene':
       return {
         kind,

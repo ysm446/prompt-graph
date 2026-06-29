@@ -9,8 +9,16 @@ import type {
   LlamaReleaseVariant,
   LlamaServerStatus,
   ProjectSnapshot,
+  ReferenceBuckets,
   WorkspaceMeta
 } from './types'
+
+export interface ImageMetadata {
+  positive: string
+  negative: string
+  settings: string
+  raw: string
+}
 
 export interface PromptGraphApi {
   getPaths(): Promise<AppPaths>
@@ -35,6 +43,9 @@ export interface PromptGraphApi {
   stopServer(): Promise<void>
   getServerStatus(): Promise<LlamaServerStatus>
   visibilityFilter(framing: string | null, tags: string[]): Promise<string[]>
+  decompose(positive: string): Promise<ReferenceBuckets>
+  openImageDialog(): Promise<string | null>
+  imageMetadata(path: string): Promise<ImageMetadata>
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void
   onServerStatus(cb: (s: LlamaServerStatus) => void): () => void

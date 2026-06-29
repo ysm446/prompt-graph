@@ -6,8 +6,37 @@ import type {
   GraphEdge,
   GraphNode,
   NodeData,
+  SeedData,
   TagData
 } from './types'
+
+/**
+ * Seed ノードのモードから seed 値リストを生成する。
+ * - fixed: [value]（既定 -1）
+ * - increment: start, start+step, … を count 個（+1 ずつ等）
+ * - random: '-1' を count 個（SD 側で毎回ランダム）
+ * - list: カンマ区切り
+ */
+export function seedValues(d: SeedData): string[] {
+  const mode = d.mode ?? 'fixed'
+  if (mode === 'list') {
+    const list = (d.value ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+    return list.length > 0 ? list : ['-1']
+  }
+  if (mode === 'increment') {
+    const count = Math.max(1, Math.floor(d.count ?? 1))
+    const step = Number.isFinite(d.step) ? d.step : 1
+    const start = Number.isFinite(d.start) ? d.start : 0
+    return Array.from({ length: count }, (_, i) => String(start + i * step))
+  }
+  if (mode === 'random') {
+    const count = Math.max(1, Math.floor(d.count ?? 1))
+    return Array.from({ length: count }, () => '-1')
+  }
+  // fixed
+  const v = (d.value ?? '').trim()
+  return [v || '-1']
+}
 
 /** "a, b,, c" -> ["a","b","c"] */
 function splitTags(raw: string): string[] {
@@ -142,8 +171,17 @@ function buildPretty(segments: string[]): string {
   return out
 }
 
-/** 単一 Scene をコンパイルする。 */
-export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: GraphEdge[]): CompiledScene {
+/**
+ * 単一 Scene をコンパイルする。
+ * overrides: スイープ用の上書き。camera ノード id → プリセット index（number）、
+ * seed ノード id → seed 値（string）。Batch の直積展開で使う。
+ */
+export function compileScene(
+  sceneNode: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  overrides?: Record<string, number | string>
+): CompiledScene {
   const g = buildGraph(nodes, edges)
   const scene = dataOf(sceneNode, 'scene')
   const warnings: string[] = []
@@ -208,13 +246,16 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
       case 'camera': {
         const d = up.data
         const lines = d.presets.split('\n').map((l) => l.trim()).filter(Boolean)
-        const chosen = lines[d.selected] ?? lines[0]
+        const ov = overrides?.[up.id]
+        const idx = typeof ov === 'number' ? ov : d.selected
+        const chosen = lines[idx] ?? lines[0]
         if (chosen) styles.push(chosen) // MVP: カメラ束はそのまま付与（順序は後述で末尾寄り）
         break
       }
       case 'seed': {
-        const v = up.data.value.trim()
-        if (v) seed = v.split(',')[0].trim()
+        const ov = overrides?.[up.id]
+        const v = typeof ov === 'string' ? ov : (seedValues(up.data)[0] ?? '')
+        if (v) seed = v
         break
       }
       default:

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC, type AppPaths } from '../shared/ipc'
-import type { PromptGraphApi } from '../shared/api'
+import type { ImageMetadata, PromptGraphApi } from '../shared/api'
+import type { ReferenceBuckets } from '../shared/types'
 import type {
   AppSettings,
   LlamaInstall,
@@ -45,6 +46,11 @@ const api: PromptGraphApi = {
   getServerStatus: (): Promise<LlamaServerStatus> => ipcRenderer.invoke(IPC.llamaStatus),
   visibilityFilter: (framing: string | null, tags: string[]): Promise<string[]> =>
     ipcRenderer.invoke(IPC.llamaVisibility, framing, tags),
+  decompose: (positive: string): Promise<ReferenceBuckets> =>
+    ipcRenderer.invoke(IPC.llamaDecompose, positive),
+  openImageDialog: (): Promise<string | null> => ipcRenderer.invoke(IPC.dialogOpenImage),
+  imageMetadata: (path: string): Promise<ImageMetadata> =>
+    ipcRenderer.invoke(IPC.imageMetadata, path),
 
   onInstallProgress: (cb: (p: LlamaInstallProgress) => void): (() => void) => {
     const handler = (_e: unknown, p: LlamaInstallProgress): void => cb(p)

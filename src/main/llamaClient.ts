@@ -1,5 +1,25 @@
 // llama-server の OpenAI 互換 API を叩くクライアント。
-// 現状は可視性フィルタ（画面外タグの判定）に使用。
+// 可視性フィルタ（画面外タグの判定）と参照プロンプト分解に使用。
+import type { ReferenceBuckets } from '../shared/types'
+
+async function chat(baseUrl: string, system: string, user: string, maxTokens: number): Promise<string> {
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      temperature: 0,
+      max_tokens: maxTokens,
+      stream: false
+    })
+  })
+  if (!res.ok) throw new Error(`LLM request failed: ${res.status}`)
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+  return data.choices?.[0]?.message?.content ?? ''
+}
 
 const SYSTEM_PROMPT = `You decide which Danbooru-style tags depict things that would NOT be visible in the frame, given a camera framing, so they can be removed from a text-to-image prompt.
 
@@ -42,22 +62,46 @@ export async function runVisibilityFilter(
 ): Promise<string[]> {
   if (tags.length === 0) return []
   const user = `Camera framing: ${framing || '(unspecified)'}\nTags:\n${tags.map((t) => `- ${t}`).join('\n')}`
-
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: user }
-      ],
-      temperature: 0, // 再現性のため決定的に
-      max_tokens: 512,
-      stream: false
-    })
-  })
-  if (!res.ok) throw new Error(`LLM request failed: ${res.status}`)
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
-  const content = data.choices?.[0]?.message?.content ?? ''
+  const content = await chat(baseUrl, SYSTEM_PROMPT, user, 512)
   return parseTagArray(content, tags)
+}
+
+// --- 参照プロンプト分解（spec §4.9）---
+
+const DECOMPOSE_PROMPT = `Split a Stable Diffusion (Danbooru-style) prompt into five buckets.
+Return ONLY a JSON object with these string keys, each a comma-separated list of tags:
+{"character":"","background":"","action":"","camera":"","style":""}
+Rules:
+- character: count tags (1girl/1boy), appearance (hair, eyes, face, body, clothing).
+- background: scenery, location, environment, objects.
+- action: poses, gestures, interactions (sitting, hugging, waving).
+- camera: framing/angle (cowboy shot, from above, close-up, portrait).
+- style: art style, medium, artist, quality tags (masterpiece, best quality).
+- Put every tag into exactly one bucket; if unsure, choose the closest. Do not invent tags.`
+
+function parseBuckets(content: string): ReferenceBuckets {
+  const empty: ReferenceBuckets = { character: '', background: '', action: '', camera: '', style: '' }
+  const match = content.match(/\{[\s\S]*\}/)
+  if (!match) return empty
+  try {
+    const obj = JSON.parse(match[0]) as Record<string, unknown>
+    const get = (k: string): string => (typeof obj[k] === 'string' ? (obj[k] as string).trim() : '')
+    return {
+      character: get('character'),
+      background: get('background'),
+      action: get('action'),
+      camera: get('camera'),
+      style: get('style')
+    }
+  } catch {
+    return empty
+  }
+}
+
+export async function runDecompose(baseUrl: string, positive: string): Promise<ReferenceBuckets> {
+  if (!positive.trim()) {
+    return { character: '', background: '', action: '', camera: '', style: '' }
+  }
+  const content = await chat(baseUrl, DECOMPOSE_PROMPT, `Prompt:\n${positive}`, 768)
+  return parseBuckets(content)
 }

@@ -28,7 +28,9 @@ const ADD_ORDER: NodeKind[] = [
   'quality',
   'style',
   'seed',
-  'scene'
+  'reference',
+  'scene',
+  'batch'
 ]
 
 type Menu =
@@ -120,6 +122,10 @@ function Canvas() {
       // soloAction の charIn は Character のみ
       if (target.type === 'soloAction' && c.targetHandle === 'charIn') {
         return source.type === 'character'
+      }
+      // Batch の入力は Scene のみ
+      if (target.type === 'batch') {
+        return source.type === 'scene'
       }
       return true
     },

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { IPC, type AppPaths } from '../shared/ipc'
 import type {
   AppSettings,
@@ -8,8 +8,9 @@ import type {
   ProjectSnapshot
 } from '../shared/types'
 import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
-import { runVisibilityFilter } from './llamaClient'
+import { runDecompose, runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
+import { readImageMetadata } from './pngMeta'
 import { Store } from './store'
 
 // 開発時はリポジトリ直下、パッケージ時は userData を基準にする
@@ -123,6 +124,28 @@ function registerIpc(): void {
     }
     return runVisibilityFilter(status.baseUrl, framing, tags)
   })
+
+  ipcMain.handle(IPC.llamaDecompose, (_e, positive: string) => {
+    const status = server.getStatus()
+    if (status.state !== 'running' || !status.baseUrl) {
+      throw new Error('モデルがロードされていません')
+    }
+    return runDecompose(status.baseUrl, positive)
+  })
+
+  ipcMain.handle(IPC.dialogOpenImage, async () => {
+    const opts = {
+      title: '参照画像を選択',
+      properties: ['openFile' as const],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+    }
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, opts)
+      : await dialog.showOpenDialog(opts)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
+
+  ipcMain.handle(IPC.imageMetadata, (_e, path: string) => readImageMetadata(path))
 }
 
 app.whenReady().then(() => {
