@@ -8,14 +8,19 @@ import type {
   LlamaRelease,
   LlamaReleaseVariant,
   LlamaServerStatus,
-  ProjectSnapshot
+  ProjectSnapshot,
+  WorkspaceMeta
 } from './types'
 
 export interface PromptGraphApi {
   getPaths(): Promise<AppPaths>
 
-  loadProject(): Promise<ProjectSnapshot | null>
-  saveProject(snapshot: ProjectSnapshot): Promise<void>
+  listWorkspaces(): Promise<WorkspaceMeta[]>
+  loadWorkspace(id: string): Promise<ProjectSnapshot | null>
+  saveWorkspace(snapshot: ProjectSnapshot): Promise<void>
+  createWorkspace(name: string): Promise<ProjectSnapshot>
+  renameWorkspace(id: string, name: string): Promise<void>
+  deleteWorkspace(id: string): Promise<void>
 
   getSettings(): Promise<AppSettings>
   saveSettings(settings: AppSettings): Promise<void>

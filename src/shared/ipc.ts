@@ -1,8 +1,12 @@
 // IPC チャンネル名の定数。main / preload で共用。
 export const IPC = {
   appPaths: 'app:paths',
-  projectLoad: 'project:load',
-  projectSave: 'project:save',
+  workspaceList: 'workspace:list',
+  workspaceLoad: 'workspace:load',
+  workspaceSave: 'workspace:save',
+  workspaceCreate: 'workspace:create',
+  workspaceRename: 'workspace:rename',
+  workspaceDelete: 'workspace:delete',
   settingsGet: 'settings:get',
   settingsSave: 'settings:save',
   llamaReleases: 'llama:releases',

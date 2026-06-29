@@ -83,11 +83,20 @@ export interface GraphEdge {
   targetHandle?: string | null
 }
 
+// ワークスペース = 1 つのグラフ（プロジェクト）。複数を保持・切替できる。
 export interface ProjectSnapshot {
   version: 1
+  id: string
   name: string
   nodes: GraphNode[]
   edges: GraphEdge[]
+}
+
+// 左サイドバー一覧用のメタ情報。
+export interface WorkspaceMeta {
+  id: string
+  name: string
+  updatedAt: string
 }
 
 export interface AppSettings {

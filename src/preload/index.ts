@@ -9,15 +9,23 @@ import type {
   LlamaRelease,
   LlamaReleaseVariant,
   LlamaServerStatus,
-  ProjectSnapshot
+  ProjectSnapshot,
+  WorkspaceMeta
 } from '../shared/types'
 
 const api: PromptGraphApi = {
   getPaths: (): Promise<AppPaths> => ipcRenderer.invoke(IPC.appPaths),
 
-  loadProject: (): Promise<ProjectSnapshot | null> => ipcRenderer.invoke(IPC.projectLoad),
-  saveProject: (snapshot: ProjectSnapshot): Promise<void> =>
-    ipcRenderer.invoke(IPC.projectSave, snapshot),
+  listWorkspaces: (): Promise<WorkspaceMeta[]> => ipcRenderer.invoke(IPC.workspaceList),
+  loadWorkspace: (id: string): Promise<ProjectSnapshot | null> =>
+    ipcRenderer.invoke(IPC.workspaceLoad, id),
+  saveWorkspace: (snapshot: ProjectSnapshot): Promise<void> =>
+    ipcRenderer.invoke(IPC.workspaceSave, snapshot),
+  createWorkspace: (name: string): Promise<ProjectSnapshot> =>
+    ipcRenderer.invoke(IPC.workspaceCreate, name),
+  renameWorkspace: (id: string, name: string): Promise<void> =>
+    ipcRenderer.invoke(IPC.workspaceRename, id, name),
+  deleteWorkspace: (id: string): Promise<void> => ipcRenderer.invoke(IPC.workspaceDelete, id),
 
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.settingsGet),
   saveSettings: (settings: AppSettings): Promise<void> =>

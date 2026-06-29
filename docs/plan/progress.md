@@ -2,6 +2,17 @@
 
 > 新しい記録を各セクションの上に追記する。日付は `YYYY-MM-DD`。
 
+## 2026-06-29 (UI 再構成)
+
+- lm-graph に倣いレイアウトを再構成。
+  - 上部バー = モデルのロード（ModelBar: モデル選択 / Load・Eject / 状態表示 / ランタイム導入ポップオーバー）。
+  - 左サイドバー = ワークスペース一覧（作成 / 切替 / ダブルクリックでリネーム / 削除 / 各行に保存ボタン）。
+  - 中央 = キャンバス（左上に「＋ノード追加」パネル、右クリックメニューも維持）、右 = 合成結果。
+- 単一 project.json から**複数ワークスペース**へ移行。`data/workspaces/<id>.json` に保存。旧 project.json は初回に自動移行。
+- store/IPC/preload/api をワークスペース CRUD（list/load/save/create/rename/delete）に刷新。
+- 終了時の `webContents.send`（破棄済みウィンドウ）を `isDestroyed()` ガードで修正。
+- 検証: typecheck / build / dev 起動（ワークスペース自動生成・移行）を確認。
+
 ## 2026-06-29
 
 - 方針確定: TypeScript 一本（Electron main で完結、lm-graph 踏襲）。可視性フィルタは後回し、まず素のプロンプト合成。

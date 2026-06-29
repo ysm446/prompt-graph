@@ -37,7 +37,9 @@ function createWindow(): void {
   })
 
   server.setListener((status) => {
-    mainWindow?.webContents.send(IPC.evtServerStatus, status)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC.evtServerStatus, status)
+    }
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -50,8 +52,14 @@ function createWindow(): void {
 function registerIpc(): void {
   ipcMain.handle(IPC.appPaths, (): AppPaths => PATHS)
 
-  ipcMain.handle(IPC.projectLoad, () => store.getProject())
-  ipcMain.handle(IPC.projectSave, (_e, snapshot: ProjectSnapshot) => store.saveProject(snapshot))
+  ipcMain.handle(IPC.workspaceList, () => store.listWorkspaces())
+  ipcMain.handle(IPC.workspaceLoad, (_e, id: string) => store.loadWorkspace(id))
+  ipcMain.handle(IPC.workspaceSave, (_e, snapshot: ProjectSnapshot) => store.saveWorkspace(snapshot))
+  ipcMain.handle(IPC.workspaceCreate, (_e, name: string) => store.createWorkspace(name))
+  ipcMain.handle(IPC.workspaceRename, (_e, id: string, name: string) =>
+    store.renameWorkspace(id, name)
+  )
+  ipcMain.handle(IPC.workspaceDelete, (_e, id: string) => store.deleteWorkspace(id))
 
   ipcMain.handle(IPC.settingsGet, () => store.getSettings())
   ipcMain.handle(IPC.settingsSave, (_e, settings: AppSettings) => store.saveSettings(settings))
