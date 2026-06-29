@@ -82,7 +82,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const inputCls =
-  'nodrag rounded border border-[#2a2e3f] bg-[#11131a] px-2 py-1 text-xs text-[#c0caf5] outline-none focus:border-[#7aa2f7]'
+  'nodrag rounded border border-[#2a2e3f] bg-[#11131a] px-2 py-1 text-xs text-[#c0caf5] outline-none placeholder:text-[#363b4d] focus:border-[#7aa2f7]'
 
 function TextInput(props: {
   value: string
