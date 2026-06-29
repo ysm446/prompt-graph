@@ -72,40 +72,55 @@ export async function runVisibilityFilter(
 
 // --- 参照プロンプト分解（spec §4.9）---
 
-const DECOMPOSE_PROMPT = `Split a Stable Diffusion (Danbooru-style) prompt into five buckets.
+const EMPTY_BUCKETS: ReferenceBuckets = {
+  character: '',
+  action: '',
+  interaction: '',
+  background: '',
+  lighting: '',
+  camera: '',
+  quality: '',
+  style: ''
+}
+
+const DECOMPOSE_PROMPT = `Split a Stable Diffusion (Danbooru-style) prompt into buckets that match the app's node categories.
 Return ONLY a JSON object with these string keys, each a comma-separated list of tags:
-{"character":"","background":"","action":"","camera":"","style":""}
+{"character":"","action":"","interaction":"","background":"","lighting":"","camera":"","quality":"","style":""}
 Rules:
 - character: count tags (1girl/1boy), appearance (hair, eyes, face, body, clothing).
+- action: a single character's pose or gesture (sitting, arms crossed, waving).
+- interaction: actions between two or more characters (hugging, holding hands, looking at each other).
 - background: scenery, location, environment, objects.
-- action: poses, gestures, interactions (sitting, hugging, waving).
-- camera: framing/angle (cowboy shot, from above, close-up, portrait).
-- style: art style, medium, artist, quality tags (masterpiece, best quality).
+- lighting: lighting/atmosphere (neon, dim, spotlight, rim light, backlighting).
+- camera: framing/angle (cowboy shot, from above, close-up, portrait, from behind).
+- quality: quality tags (masterpiece, best quality, absurdres, highres).
+- style: art style, medium, artist names.
 - Put every tag into exactly one bucket; if unsure, choose the closest. Do not invent tags.`
 
 function parseBuckets(content: string): ReferenceBuckets {
-  const empty: ReferenceBuckets = { character: '', background: '', action: '', camera: '', style: '' }
   const match = content.match(/\{[\s\S]*\}/)
-  if (!match) return empty
+  if (!match) return { ...EMPTY_BUCKETS }
   try {
     const obj = JSON.parse(match[0]) as Record<string, unknown>
-    const get = (k: string): string => (typeof obj[k] === 'string' ? (obj[k] as string).trim() : '')
+    const get = (k: keyof ReferenceBuckets): string =>
+      typeof obj[k] === 'string' ? (obj[k] as string).trim() : ''
     return {
       character: get('character'),
-      background: get('background'),
       action: get('action'),
+      interaction: get('interaction'),
+      background: get('background'),
+      lighting: get('lighting'),
       camera: get('camera'),
+      quality: get('quality'),
       style: get('style')
     }
   } catch {
-    return empty
+    return { ...EMPTY_BUCKETS }
   }
 }
 
 export async function runDecompose(baseUrl: string, positive: string): Promise<ReferenceBuckets> {
-  if (!positive.trim()) {
-    return { character: '', background: '', action: '', camera: '', style: '' }
-  }
+  if (!positive.trim()) return { ...EMPTY_BUCKETS }
   const content = await chat(baseUrl, DECOMPOSE_PROMPT, `Prompt:\n${positive}`, 768)
   return parseBuckets(content)
 }

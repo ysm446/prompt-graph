@@ -21,6 +21,7 @@ export const IPC = {
   llamaDecompose: 'llama:decompose',
   dialogOpenImage: 'dialog:open-image',
   imageMetadata: 'image:metadata',
+  imageDataUrl: 'image:dataurl',
   systemResources: 'system:resources',
   // main -> renderer events
   evtInstallProgress: 'llama:install-progress',

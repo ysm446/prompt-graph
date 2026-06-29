@@ -47,6 +47,7 @@ export interface PromptGraphApi {
   decompose(positive: string): Promise<ReferenceBuckets>
   openImageDialog(): Promise<string | null>
   imageMetadata(path: string): Promise<ImageMetadata>
+  imageDataUrl(path: string): Promise<string>
   getSystemResources(): Promise<SystemResources>
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void

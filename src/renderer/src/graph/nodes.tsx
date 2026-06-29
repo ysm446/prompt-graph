@@ -125,20 +125,8 @@ function TextInput(props: {
   )
 }
 
+// 内容に合わせて高さが自動で伸びる textarea（内部スクロールバーを出さず、ノードごと縦に伸びる）
 function Area(props: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }) {
-  return (
-    <textarea
-      className={`${inputCls} resize-none`}
-      rows={props.rows ?? 2}
-      value={props.value}
-      placeholder={props.placeholder}
-      onChange={(e) => props.onChange(e.target.value)}
-    />
-  )
-}
-
-// 内容に合わせて高さが自動で伸びる textarea（内部スクロールバーを出さない）
-function AutoArea(props: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
     const el = ref.current
@@ -150,7 +138,7 @@ function AutoArea(props: { value: string; onChange: (v: string) => void; placeho
     <textarea
       ref={ref}
       className={`${inputCls} resize-none overflow-hidden`}
-      rows={1}
+      rows={props.rows ?? 1}
       value={props.value}
       placeholder={props.placeholder}
       onChange={(e) => props.onChange(e.target.value)}
@@ -249,7 +237,7 @@ export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
   return (
     <Shell id={id} kind="camera" title={`🎥 ${d.label}`} selected={selected}>
       <Field label="presets (1行=1プリセット)">
-        <AutoArea value={d.presets} onChange={(v) => update({ presets: v })} />
+        <Area value={d.presets} onChange={(v) => update({ presets: v })} />
       </Field>
       <Field label="使用プリセット">
         <select
@@ -496,9 +484,12 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
 // Reference: 既存画像のメタデータ(プロンプト)を読み込み、バケツに分解（spec §4.9）
 const BUCKET_LABELS: Array<{ key: keyof Extract<NodeData, { kind: 'reference' }>['buckets']; label: string }> = [
   { key: 'character', label: 'Character' },
-  { key: 'background', label: 'Background' },
   { key: 'action', label: 'Action' },
+  { key: 'interaction', label: 'Interaction' },
+  { key: 'background', label: 'Background' },
+  { key: 'lighting', label: 'Lighting' },
   { key: 'camera', label: 'Camera' },
+  { key: 'quality', label: 'Quality' },
   { key: 'style', label: 'Style' }
 ]
 
@@ -508,11 +499,28 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
   const [running, setRunning] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [preview, setPreview] = useState<string | null>(null) // data URL（非永続）
 
   useEffect(() => {
     window.api.getServerStatus().then((s) => setRunning(s.state === 'running'))
     return window.api.onServerStatus((s) => setRunning(s.state === 'running'))
   }, [])
+
+  // imagePath が変わったらプレビュー画像を読み込む（保存はしない）
+  useEffect(() => {
+    let alive = true
+    if (!d.imagePath) {
+      setPreview(null)
+      return
+    }
+    window.api
+      .imageDataUrl(d.imagePath)
+      .then((url) => alive && setPreview(url))
+      .catch(() => alive && setPreview(null))
+    return () => {
+      alive = false
+    }
+  }, [d.imagePath])
 
   async function load() {
     setErr(null)
@@ -554,6 +562,13 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
       >
         画像を読み込む
       </button>
+      {preview && (
+        <img
+          src={preview}
+          alt={fileName}
+          className="max-h-40 w-full rounded border border-[#2a2e3f] object-contain"
+        />
+      )}
       {fileName && <div className="truncate text-[10px] text-[#565f89]">{fileName}</div>}
 
       <Field label="positive (抽出)">

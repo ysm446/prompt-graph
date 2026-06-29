@@ -51,6 +51,7 @@ const api: PromptGraphApi = {
   openImageDialog: (): Promise<string | null> => ipcRenderer.invoke(IPC.dialogOpenImage),
   imageMetadata: (path: string): Promise<ImageMetadata> =>
     ipcRenderer.invoke(IPC.imageMetadata, path),
+  imageDataUrl: (path: string): Promise<string> => ipcRenderer.invoke(IPC.imageDataUrl, path),
   getSystemResources: (): Promise<SystemResources> => ipcRenderer.invoke(IPC.systemResources),
 
   onInstallProgress: (cb: (p: LlamaInstallProgress) => void): (() => void) => {

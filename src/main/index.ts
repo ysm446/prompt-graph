@@ -10,7 +10,7 @@ import type {
 import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
 import { runDecompose, runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
-import { readImageMetadata } from './pngMeta'
+import { readImageDataUrl, readImageMetadata } from './pngMeta'
 import { getResources } from './systemInfo'
 import { Store } from './store'
 
@@ -148,6 +148,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.imageMetadata, (_e, path: string) => readImageMetadata(path))
+  ipcMain.handle(IPC.imageDataUrl, (_e, path: string) => readImageDataUrl(path))
 
   ipcMain.handle(IPC.systemResources, () => getResources())
 }

@@ -84,7 +84,16 @@ export function defaultData(kind: NodeKind): NodeData {
         positive: '',
         negative: '',
         settings: '',
-        buckets: { character: '', background: '', action: '', camera: '', style: '' }
+        buckets: {
+          character: '',
+          action: '',
+          interaction: '',
+          background: '',
+          lighting: '',
+          camera: '',
+          quality: '',
+          style: ''
+        }
       }
     case 'batch':
       return { kind, label: 'Batch', mode: 'all', randomCount: 8, sampleCount: 5 }

@@ -64,11 +64,15 @@ export type SeedData = {
 }
 
 // Reference: 既存画像のメタデータ(プロンプト)を読み込み、バケツに分解する。
+// バケツは現状のノードカテゴリに対応させる。
 export type ReferenceBuckets = {
   character: string
-  background: string
   action: string
+  interaction: string
+  background: string
+  lighting: string
   camera: string
+  quality: string
   style: string
 }
 

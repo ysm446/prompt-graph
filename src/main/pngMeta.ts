@@ -1,6 +1,7 @@
 // PNG の埋め込みメタデータ（A1111 互換 "parameters"）をローカルで読み取る。
 // Forge 不要。tEXt / iTXt チャンクを解析する。
 import { readFile } from 'node:fs/promises'
+import { extname } from 'node:path'
 import { inflateSync } from 'node:zlib'
 
 export interface ImageMetadata {
@@ -80,6 +81,14 @@ function parseA1111(raw: string): ImageMetadata {
     positive = body.trim()
   }
   return { positive, negative, settings, raw }
+}
+
+/** 画像ファイルを data URL（表示用）に変換。CSP の都合で file:// が使えないため。 */
+export async function readImageDataUrl(path: string): Promise<string> {
+  const buf = await readFile(path)
+  const ext = extname(path).toLowerCase()
+  const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+  return `data:${mime};base64,${buf.toString('base64')}`
 }
 
 export async function readImageMetadata(path: string): Promise<ImageMetadata> {
