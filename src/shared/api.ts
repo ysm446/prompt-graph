@@ -34,6 +34,7 @@ export interface PromptGraphApi {
   startServer(modelPath: string, mmprojPath: string | null): Promise<LlamaServerStatus>
   stopServer(): Promise<void>
   getServerStatus(): Promise<LlamaServerStatus>
+  visibilityFilter(framing: string | null, tags: string[]): Promise<string[]>
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void
   onServerStatus(cb: (s: LlamaServerStatus) => void): () => void

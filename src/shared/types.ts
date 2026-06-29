@@ -63,6 +63,10 @@ export type SceneData = {
   peoplePerCharacter: boolean
   peopleTag: string // 手動指定（auto が false のとき使用、常に先頭）
   useBreak: boolean // 複数キャラブロックを BREAK で分割（spec §6）
+  // 可視性フィルタ（spec §4.11）: カメラのフレーミングから画面外の空間タグを除去
+  visibilityEnabled: boolean
+  visibilityRemoved: string[] // 除去するタグ（LLM が提案、ユーザー手修正可）
+  visibilityKey: string // 最後に実行したときの入力ハッシュ（再実行判定用）
 }
 
 export type NodeData =

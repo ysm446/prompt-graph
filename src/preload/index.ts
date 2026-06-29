@@ -43,6 +43,8 @@ const api: PromptGraphApi = {
     ipcRenderer.invoke(IPC.llamaStart, modelPath, mmprojPath),
   stopServer: (): Promise<void> => ipcRenderer.invoke(IPC.llamaStop),
   getServerStatus: (): Promise<LlamaServerStatus> => ipcRenderer.invoke(IPC.llamaStatus),
+  visibilityFilter: (framing: string | null, tags: string[]): Promise<string[]> =>
+    ipcRenderer.invoke(IPC.llamaVisibility, framing, tags),
 
   onInstallProgress: (cb: (p: LlamaInstallProgress) => void): (() => void) => {
     const handler = (_e: unknown, p: LlamaInstallProgress): void => cb(p)

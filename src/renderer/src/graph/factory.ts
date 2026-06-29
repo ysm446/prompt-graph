@@ -81,7 +81,10 @@ export function defaultData(kind: NodeKind): NodeData {
         peopleTagAuto: true,
         peoplePerCharacter: true,
         peopleTag: '',
-        useBreak: true
+        useBreak: true,
+        visibilityEnabled: false,
+        visibilityRemoved: [],
+        visibilityKey: ''
       }
   }
 }

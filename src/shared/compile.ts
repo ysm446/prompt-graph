@@ -30,6 +30,12 @@ function characterTags(data: CharacterData): string[] {
   )
 }
 
+/** removeSet（小文字化済み）に含まれるタグを落とす。可視性フィルタの適用。 */
+function filterRemoved(tags: string[], removeSet: Set<string>): string[] {
+  if (removeSet.size === 0) return tags
+  return tags.filter((t) => !removeSet.has(t.trim().toLowerCase()))
+}
+
 interface Graph {
   nodes: Map<string, GraphNode>
   /** target -> その上流（source）ノード id 群 */
@@ -62,13 +68,13 @@ interface ChainResult {
   warning?: string
 }
 
-function resolveCharacterChain(startId: string, g: Graph): ChainResult | null {
+function resolveCharacterChain(startId: string, g: Graph, removeSet: Set<string>): ChainResult | null {
   const start = g.nodes.get(startId)
   if (!start) return null
 
   if (start.data.kind === 'character') {
     const c = start.data
-    const block = characterTags(c).join(', ')
+    const block = filterRemoved(characterTags(c), removeSet).join(', ')
     return { block: applyWeight(block, c.weight), person: c.person ?? 'girl' }
   }
 
@@ -77,7 +83,7 @@ function resolveCharacterChain(startId: string, g: Graph): ChainResult | null {
     // soloAction の上流から character を探す
     const ups = g.incomers.get(startId) ?? []
     const charNode = ups.map((id) => g.nodes.get(id)).find((n) => n?.data.kind === 'character')
-    const actionTags = splitTags(action.tags)
+    const actionTags = filterRemoved(splitTags(action.tags), removeSet)
     if (!charNode) {
       const block = applyWeight(actionTags.join(', '), action.weight)
       return block
@@ -85,7 +91,7 @@ function resolveCharacterChain(startId: string, g: Graph): ChainResult | null {
         : null
     }
     const c = charNode.data as CharacterData & { kind: 'character' }
-    const parts = [...characterTags(c), ...actionTags]
+    const parts = [...filterRemoved(characterTags(c), removeSet), ...actionTags]
     const block = parts.join(', ')
     // weight はキャラ側を優先（束ねたブロック全体に適用）
     return { block: applyWeight(block, c.weight), person: c.person ?? 'girl' }
@@ -143,6 +149,12 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
   const warnings: string[] = []
   const ups = (g.incomers.get(sceneNode.id) ?? []).map((id) => g.nodes.get(id)!).filter(Boolean)
 
+  // 可視性フィルタの除去セット（空間要素＝キャラ/背景のタグにのみ適用）
+  const removeSet =
+    scene?.visibilityEnabled && scene.visibilityRemoved
+      ? new Set(scene.visibilityRemoved.map((t) => t.trim().toLowerCase()).filter(Boolean))
+      : new Set<string>()
+
   // --- 収集 ---
   const characterEntries: Array<{ block: string; person?: string }> = []
   const qualities: string[] = []
@@ -156,7 +168,7 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
     switch (up.data.kind) {
       case 'character':
       case 'soloAction': {
-        const r = resolveCharacterChain(up.id, g)
+        const r = resolveCharacterChain(up.id, g, removeSet)
         if (r) {
           if (r.warning) warnings.push(r.warning)
           if (r.block || r.person) characterEntries.push({ block: r.block, person: r.person })
@@ -171,7 +183,7 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
       }
       case 'background': {
         const d = up.data as TagData
-        const b = applyWeight(splitTags(d.tags).join(', '), d.weight)
+        const b = applyWeight(filterRemoved(splitTags(d.tags), removeSet).join(', '), d.weight)
         if (b) backgrounds.push(b)
         break
       }
@@ -257,4 +269,53 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
   if (characterEntries.length > 2) warnings.push('キャラは最大2人を想定（3人以上はスコープ外）')
 
   return { sceneId: sceneNode.id, positive, positivePretty, seed, warnings }
+}
+
+/**
+ * 可視性フィルタの入力を集める。
+ * - framing: 接続された Camera の選択プリセット（アングル/フレーミング）。
+ * - tags: 空間に紐づく候補タグ（キャラのカテゴリ + ソロアクション + 背景）。重複除去。
+ * lighting / quality / style は対象外（全体に効くので素通り）。
+ */
+export function getVisibilityInput(
+  sceneNode: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[]
+): { framing: string | null; tags: string[] } {
+  const g = buildGraph(nodes, edges)
+  const ups = (g.incomers.get(sceneNode.id) ?? []).map((id) => g.nodes.get(id)!).filter(Boolean)
+  const tags: string[] = []
+  let framing: string | null = null
+
+  for (const up of ups) {
+    if (up.data.kind === 'character') {
+      tags.push(...characterTags(up.data))
+    } else if (up.data.kind === 'soloAction') {
+      const chUps = g.incomers.get(up.id) ?? []
+      const charNode = chUps.map((id) => g.nodes.get(id)).find((n) => n?.data.kind === 'character')
+      if (charNode?.data.kind === 'character') tags.push(...characterTags(charNode.data))
+      tags.push(...splitTags(up.data.tags))
+    } else if (up.data.kind === 'background') {
+      tags.push(...splitTags(up.data.tags))
+    } else if (up.data.kind === 'camera') {
+      const lines = up.data.presets.split('\n').map((l) => l.trim()).filter(Boolean)
+      framing = lines[up.data.selected] ?? lines[0] ?? null
+    }
+  }
+
+  // 重複除去（小文字キーで判定し、最初の表記を残す）
+  const seen = new Set<string>()
+  const deduped: string[] = []
+  for (const t of tags) {
+    const key = t.trim().toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    deduped.push(t.trim())
+  }
+  return { framing, tags: deduped }
+}
+
+/** 可視性フィルタの入力ハッシュ（再実行判定用）。 */
+export function visibilityHash(framing: string | null, tags: string[]): string {
+  return JSON.stringify({ f: framing ?? '', t: [...tags].map((t) => t.toLowerCase()).sort() })
 }

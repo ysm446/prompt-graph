@@ -2,6 +2,16 @@
 
 > 新しい記録を各セクションの上に追記する。日付は `YYYY-MM-DD`。
 
+## 2026-06-29 (可視性フィルタ)
+
+- 可視性フィルタ（spec §4.11）を実装。Scene ノード内に「実行」ボタンを配置。
+  - 方式: LLM 判断型。カメラのフレーミング＋空間タグ（キャラ/ソロアクション/背景）を llama-server（OpenAI 互換 `/v1/chat/completions`, temperature 0）に渡し、画面外タグを除去候補として取得。
+  - 結果は Scene データに保存（再現性）。チップ表示でクリック取り消し＋手動追加（手修正）。
+  - compile が `visibilityEnabled` 時に該当タグをキャラ/背景から除去。lighting/quality/style は素通り。
+  - 関連: `shared/compile.ts`（getVisibilityInput / visibilityHash / filterRemoved）、`main/llamaClient.ts`、IPC `llama:visibility`。
+- 未対応（今後）: ゾーンタグ方式（spec の head/upper/floor 等の構造的判定）への精緻化、ハッシュキャッシュの main 側共有。現状は Scene 保存による再現性で代替。
+- 注意: 実行には llama.cpp ランタイム導入＋モデルのロードが必要（上部バーから）。
+
 ## 2026-06-29 (UI 再構成)
 
 - lm-graph に倣いレイアウトを再構成。

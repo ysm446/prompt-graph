@@ -8,6 +8,7 @@ import type {
   ProjectSnapshot
 } from '../shared/types'
 import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
+import { runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
 import { Store } from './store'
 
@@ -114,6 +115,14 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.llamaStop, () => server.stop())
   ipcMain.handle(IPC.llamaStatus, () => server.getStatus())
+
+  ipcMain.handle(IPC.llamaVisibility, (_e, framing: string | null, tags: string[]) => {
+    const status = server.getStatus()
+    if (status.state !== 'running' || !status.baseUrl) {
+      throw new Error('モデルがロードされていません')
+    }
+    return runVisibilityFilter(status.baseUrl, framing, tags)
+  })
 }
 
 app.whenReady().then(() => {

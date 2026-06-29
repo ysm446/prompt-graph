@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import type { ReactNode } from 'react'
-import type { NodeData, NodeKind } from '@shared/types'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
+import { getVisibilityInput, visibilityHash } from '@shared/compile'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
 import { SCENE_INPUTS } from './factory'
@@ -235,6 +236,120 @@ export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
+// 可視性フィルタ（spec §4.11）: カメラのフレーミングから画面外タグを LLM で除去
+function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
+  const update = useUpdate(id)
+  const [running, setRunning] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [addDraft, setAddDraft] = useState('')
+
+  useEffect(() => {
+    window.api.getServerStatus().then((s) => setRunning(s.state === 'running'))
+    return window.api.onServerStatus((s) => setRunning(s.state === 'running'))
+  }, [])
+
+  const removed = d.visibilityRemoved ?? []
+
+  async function run() {
+    setErr(null)
+    setBusy(true)
+    try {
+      const state = useGraphStore.getState()
+      const gNodes: GraphNode[] = state.nodes.map((n) => ({
+        id: n.id,
+        kind: n.type as NodeKind,
+        position: n.position,
+        data: n.data
+      }))
+      const gEdges: GraphEdge[] = state.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle ?? null,
+        targetHandle: e.targetHandle ?? null
+      }))
+      const sceneNode = gNodes.find((n) => n.id === id)
+      if (!sceneNode) return
+      const { framing, tags } = getVisibilityInput(sceneNode, gNodes, gEdges)
+      if (!framing) {
+        setErr('Camera が接続されていません（フレーミング不明）')
+        return
+      }
+      const result = await window.api.visibilityFilter(framing, tags)
+      update({ visibilityRemoved: result, visibilityKey: visibilityHash(framing, tags) })
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="-mx-3 mt-1 border-t border-[#2a2e3f] px-3 pt-2">
+      <label className="flex items-center gap-2 text-[10px] text-[#565f89]">
+        <input
+          type="checkbox"
+          className="nodrag"
+          checked={d.visibilityEnabled ?? false}
+          onChange={(e) => update({ visibilityEnabled: e.target.checked })}
+        />
+        可視性フィルタ（画面外タグを除去）
+      </label>
+
+      {d.visibilityEnabled && (
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <button
+              className="nodrag rounded bg-[#bb9af7] px-2 py-0.5 text-[10px] font-semibold text-[#11131a] hover:opacity-90 disabled:opacity-40"
+              onClick={run}
+              disabled={busy || !running}
+            >
+              {busy ? '判定中…' : '実行'}
+            </button>
+            {!running && <span className="text-[10px] text-[#e0af68]">モデルをロードしてください</span>}
+          </div>
+
+          {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+
+          <div className="text-[10px] text-[#565f89]">
+            除去トークン（クリックで戻す / 手修正可）:
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {removed.length === 0 && <span className="text-[10px] text-[#3a3f55]">なし</span>}
+            {removed.map((t) => (
+              <button
+                key={t}
+                className="nodrag rounded bg-[#2a2e3f] px-1.5 py-0.5 text-[10px] text-[#f7768e] hover:bg-[#3a3f55]"
+                title="クリックで除去を取り消す"
+                onClick={() => update({ visibilityRemoved: removed.filter((x) => x !== t) })}
+              >
+                {t} ✕
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-1">
+            <input
+              className={`${inputCls} flex-1`}
+              value={addDraft}
+              placeholder="手動で除去するタグ"
+              onChange={(e) => setAddDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const t = addDraft.trim()
+                  if (t && !removed.includes(t)) update({ visibilityRemoved: [...removed, t] })
+                  setAddDraft('')
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
@@ -290,6 +405,8 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
         />
         複数キャラを BREAK で分割
       </label>
+
+      <VisibilitySection id={id} d={d} />
     </Shell>
   )
 }
