@@ -80,11 +80,11 @@ export function ModelBar() {
 
   return (
     <header className="relative z-30 flex h-12 items-center gap-3 border-b border-[#2a2e3f] bg-[#16171f] px-4 text-xs text-[#c0caf5]">
-      <span className="font-bold text-[#7aa2f7]">prompt-graph</span>
+      {/* left: 中央寄せのための空スペーサー（右の runtime と均等幅） */}
+      <div className="flex-1" />
 
-      <div className="mx-1 h-5 w-px bg-[#2a2e3f]" />
-
-      {/* model select */}
+      {/* center: モデル選択バー */}
+      <div className="flex items-center gap-3">
       <span className="text-[10px] uppercase tracking-wide text-[#565f89]">モデル</span>
       <select
         className="min-w-56 rounded border border-[#2a2e3f] bg-[#11131a] px-2 py-1 disabled:opacity-50"
@@ -129,24 +129,25 @@ export function ModelBar() {
       </span>
 
       {error && <span className="text-[10px] text-[#f7768e]">{error}</span>}
+      </div>
 
-      <div className="flex-1" />
-
-      {/* runtime install */}
-      <div className="relative" ref={runtimeRef}>
-        <button
-          className={`rounded border px-2 py-1 ${
-            install ? 'border-[#2a2e3f] text-[#c0caf5]' : 'border-[#e0af68] text-[#e0af68]'
-          } hover:border-[#7aa2f7]`}
-          onClick={() => setShowRuntime((v) => !v)}
-        >
-          {install ? '⚙ ランタイム' : '⚠ ランタイム未導入'}
-        </button>
-        {showRuntime && (
-          <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">
-            <RuntimeInstall onInstalled={(i) => setInstall(i)} />
-          </div>
-        )}
+      {/* right: runtime install（左の title と均等幅にして中央を真ん中へ） */}
+      <div className="flex flex-1 items-center justify-end">
+        <div className="relative" ref={runtimeRef}>
+          <button
+            className={`rounded border px-2 py-1 ${
+              install ? 'border-[#2a2e3f] text-[#c0caf5]' : 'border-[#e0af68] text-[#e0af68]'
+            } hover:border-[#7aa2f7]`}
+            onClick={() => setShowRuntime((v) => !v)}
+          >
+            {install ? '⚙ ランタイム' : '⚠ ランタイム未導入'}
+          </button>
+          {showRuntime && (
+            <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">
+              <RuntimeInstall onInstalled={(i) => setInstall(i)} />
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
