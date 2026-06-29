@@ -10,8 +10,13 @@ import type {
   ProjectSnapshot,
   WorkspaceMeta
 } from '../shared/types'
+import { DEFAULT_VISIBILITY_PROMPT } from '../shared/prompts'
 
-const DEFAULT_SETTINGS: AppSettings = { selectedModelPath: null, contextSize: 4096 }
+const DEFAULT_SETTINGS: AppSettings = {
+  selectedModelPath: null,
+  contextSize: 4096,
+  visibilityPrompt: DEFAULT_VISIBILITY_PROMPT
+}
 
 export class Store {
   private readonly workspacesDir: string

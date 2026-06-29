@@ -154,6 +154,7 @@ export interface WorkspaceMeta {
 export interface AppSettings {
   selectedModelPath: string | null
   contextSize: number
+  visibilityPrompt: string // 可視性フィルタのシステムプロンプト（編集可）
 }
 
 // ============================================================

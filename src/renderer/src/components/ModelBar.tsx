@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
 import { RuntimeInstall } from './RuntimeInstall'
+import { SettingsPanel } from './SettingsPanel'
 
 const STATE_COLOR: Record<LlamaServerStatus['state'], string> = {
   running: '#9ece6a',
@@ -29,8 +30,10 @@ export function ModelBar() {
   })
   const [busy, setBusy] = useState(false)
   const [showRuntime, setShowRuntime] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const runtimeRef = useRef<HTMLDivElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     window.api.getInstall().then(setInstall)
@@ -48,6 +51,16 @@ export function ModelBar() {
     window.addEventListener('mousedown', onClick)
     return () => window.removeEventListener('mousedown', onClick)
   }, [showRuntime])
+
+  // 設定ポップオーバーの外側クリックで閉じる
+  useEffect(() => {
+    if (!showSettings) return
+    const onClick = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) setShowSettings(false)
+    }
+    window.addEventListener('mousedown', onClick)
+    return () => window.removeEventListener('mousedown', onClick)
+  }, [showSettings])
 
   async function refreshModels() {
     const list = await window.api.listModels()
@@ -145,6 +158,22 @@ export function ModelBar() {
           {showRuntime && (
             <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">
               <RuntimeInstall onInstalled={(i) => setInstall(i)} />
+            </div>
+          )}
+        </div>
+
+        {/* settings */}
+        <div className="relative" ref={settingsRef}>
+          <button
+            className="rounded border border-[#2a2e3f] px-2 py-1 hover:border-[#7aa2f7]"
+            onClick={() => setShowSettings((v) => !v)}
+            title="設定"
+          >
+            ⚙
+          </button>
+          {showSettings && (
+            <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">
+              <SettingsPanel />
             </div>
           )}
         </div>

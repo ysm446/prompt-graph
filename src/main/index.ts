@@ -117,12 +117,13 @@ function registerIpc(): void {
   ipcMain.handle(IPC.llamaStop, () => server.stop())
   ipcMain.handle(IPC.llamaStatus, () => server.getStatus())
 
-  ipcMain.handle(IPC.llamaVisibility, (_e, framing: string | null, tags: string[]) => {
+  ipcMain.handle(IPC.llamaVisibility, async (_e, framing: string | null, tags: string[]) => {
     const status = server.getStatus()
     if (status.state !== 'running' || !status.baseUrl) {
       throw new Error('モデルがロードされていません')
     }
-    return runVisibilityFilter(status.baseUrl, framing, tags)
+    const settings = await store.getSettings()
+    return runVisibilityFilter(status.baseUrl, framing, tags, settings.visibilityPrompt)
   })
 
   ipcMain.handle(IPC.llamaDecompose, (_e, positive: string) => {

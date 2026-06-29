@@ -1,6 +1,7 @@
 // llama-server の OpenAI 互換 API を叩くクライアント。
 // 可視性フィルタ（画面外タグの判定）と参照プロンプト分解に使用。
 import type { ReferenceBuckets } from '../shared/types'
+import { DEFAULT_VISIBILITY_PROMPT } from '../shared/prompts'
 
 /** 思考（reasoning）出力を除去する。思考対応モデルが <think>…</think> を出しても無害化。 */
 function stripThinking(s: string): string {
@@ -32,15 +33,6 @@ async function chat(baseUrl: string, system: string, user: string, maxTokens: nu
   return stripThinking(data.choices?.[0]?.message?.content ?? '')
 }
 
-const SYSTEM_PROMPT = `You decide which Danbooru-style tags depict things that would NOT be visible in the frame, given a camera framing, so they can be removed from a text-to-image prompt.
-
-Rules:
-- Only remove tags for body parts, clothing, or scenery clearly outside the frame for the given framing/angle.
-  Examples: with "head focus" / "portrait", remove lower-body clothing and footwear; with "from above", floor-level scenery may be hidden, etc.
-- Keep any tag that could plausibly be visible, and keep ambiguous tags.
-- Never invent tags. Only choose from the given list.
-- Output ONLY a JSON array of the exact tags to remove, e.g. ["black skirt","shoes"]. If nothing should be removed, output [].`
-
 function parseTagArray(content: string, candidates: string[]): string[] {
   const match = content.match(/\[[\s\S]*\]/)
   let arr: unknown = []
@@ -69,11 +61,12 @@ function parseTagArray(content: string, candidates: string[]): string[] {
 export async function runVisibilityFilter(
   baseUrl: string,
   framing: string | null,
-  tags: string[]
+  tags: string[],
+  systemPrompt: string
 ): Promise<string[]> {
   if (tags.length === 0) return []
   const user = `Camera framing: ${framing || '(unspecified)'}\nTags:\n${tags.map((t) => `- ${t}`).join('\n')}`
-  const content = await chat(baseUrl, SYSTEM_PROMPT, user, 512)
+  const content = await chat(baseUrl, systemPrompt || DEFAULT_VISIBILITY_PROMPT, user, 512)
   return parseTagArray(content, tags)
 }
 
