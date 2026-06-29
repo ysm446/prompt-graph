@@ -1,0 +1,35 @@
+{
+  "name": "prompt-graph",
+  "version": "0.1.0",
+  "description": "Node-graph prompt composer for Stable Diffusion (WebUI Forge), with local llama.cpp",
+  "license": "MIT",
+  "author": "ysm446",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "rebuild:electron": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.8.5",
+    "nanoid": "^5.1.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "electron": "^37.2.6",
+    "electron-vite": "^4.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7"
+  }
+}

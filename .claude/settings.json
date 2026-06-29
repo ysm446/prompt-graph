@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm run *)",
+      "Bash(break)",
+      "Bash(tasklist)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

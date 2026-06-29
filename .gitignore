@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+.vite/
+*.tsbuildinfo
+
+# runtime / user data (downloaded llama.cpp, project saves)
+bin/
+data/
+
+# large model weights (kept locally, not committed)
+models/**/*.gguf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
