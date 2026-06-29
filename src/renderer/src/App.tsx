@@ -137,6 +137,7 @@ function Canvas() {
         onMoveStart={closeMenu}
         fitView
         deleteKeyCode={['Delete', 'Backspace']}
+        connectionRadius={45}
         proOptions={{ hideAttribution: true }}
       >
         <Panel position="top-left">
