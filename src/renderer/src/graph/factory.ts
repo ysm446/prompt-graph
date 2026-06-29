@@ -8,6 +8,7 @@ export const NODE_LABELS: Record<NodeKind, string> = {
   background: 'Background',
   lighting: 'Lighting',
   camera: 'Camera',
+  quality: 'Quality',
   style: 'Style',
   seed: 'Seed',
   scene: 'Scene'
@@ -19,6 +20,7 @@ export function defaultData(kind: NodeKind): NodeData {
       return {
         kind,
         label: 'Character',
+        person: 'girl',
         face: '',
         hair: '',
         upper: '',
@@ -35,8 +37,10 @@ export function defaultData(kind: NodeKind): NodeData {
       return { kind, label: 'Background', tags: '', weight: 1 }
     case 'lighting':
       return { kind, label: 'Lighting', tags: '', weight: 1 }
+    case 'quality':
+      return { kind, label: 'Quality', tags: 'masterpiece, best quality', weight: 1 }
     case 'style':
-      return { kind, label: 'Style', tags: 'masterpiece, best quality', weight: 1 }
+      return { kind, label: 'Style', tags: '', weight: 1 }
     case 'camera':
       return {
         kind,

@@ -111,7 +111,14 @@
 
 ### 4.7 Style ノード
 
-- 役割: 全体のスタイル・品質タグ。可視性フィルタ対象外。スイープ軸。
+- 役割: 全体のスタイル（画風・画材・絵師など）。可視性フィルタ対象外。スイープ軸。
+- 品質タグは持たせない（Quality に寄せる）。
+
+### 4.7.1 Quality ノード
+
+- 役割: 品質タグ（`masterpiece` / `best quality` / `absurdres` 等）。
+- プロンプト**先頭**に配置する（先頭ほど効きが強いため）。Style とは別ノード。
+- 可視性フィルタ対象外（全体に効く）。スイープ軸にもなる。
 
 ### 4.8 Seed ノード
 
@@ -152,10 +159,11 @@
 ## 5. プロンプト合成パイプライン（Scene コンパイル順）
 
 1. スロット解決（Reference 既定値 ＋ 専用ノードによる上書き）。
-2. 収集: 各キャラの鎖（character ＋ solo action）、interaction、background、lighting、style。
+2. 収集: 各キャラの鎖（character ＋ solo action）、interaction、background、lighting、quality、style。
 3. 可視性フィルタを空間要素（キャラのゾーン、背景のゾーン）に適用。キャッシュ＋手修正。
 4. 複数キャラ時は単一プロンプトに合成（§6）。
 5. 順序づけ＋ weight 付与（positive のみ。negative プロンプトは使わない）。
+   - 順序: quality（先頭）→ 人数タグ → キャラ各ブロック → interaction → background → lighting → style。
 6. seed / 設定を決定。
 7. Forge `txt2img` へ送信。
 

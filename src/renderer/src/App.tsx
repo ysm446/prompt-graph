@@ -25,6 +25,7 @@ const ADD_ORDER: NodeKind[] = [
   'background',
   'lighting',
   'camera',
+  'quality',
   'style',
   'seed',
   'scene'

@@ -11,6 +11,7 @@ export type NodeKind =
   | 'background'
   | 'lighting'
   | 'camera'
+  | 'quality'
   | 'style'
   | 'seed'
   | 'scene'
@@ -23,6 +24,9 @@ export type NodeKind =
 // （空間ゾーンタグ＝可視性フィルタ用は後段で追加する）
 export type CharacterData = {
   label: string
+  // 人物/被写体の数え名詞（例: girl, boy, guy, dog）。Scene が数えて人数タグ
+  // （2girls / 1girl, 1dog 等）を生成する。タグ欄には出さない。空なら数えない。
+  person: string
   face: string
   hair: string
   upper: string
@@ -63,6 +67,7 @@ export type NodeData =
   | ({ kind: 'interaction' } & TagData)
   | ({ kind: 'background' } & TagData)
   | ({ kind: 'lighting' } & TagData)
+  | ({ kind: 'quality' } & TagData)
   | ({ kind: 'style' } & TagData)
   | ({ kind: 'camera' } & CameraData)
   | ({ kind: 'seed' } & SeedData)

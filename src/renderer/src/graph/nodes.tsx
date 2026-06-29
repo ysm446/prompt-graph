@@ -11,6 +11,7 @@ const ACCENT: Record<NodeKind, string> = {
   background: '#7dcfff',
   lighting: '#bb9af7',
   camera: '#f7768e',
+  quality: '#f7c873',
   style: '#73daca',
   seed: '#a9b1d6',
   scene: '#ff9e64'
@@ -132,6 +133,13 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
   const update = useUpdate(id)
   return (
     <Shell id={id} kind="character" title={`👤 ${d.label}`} selected={selected}>
+      <Field label="数え名詞 (人数タグ集計用 / 空で無効)">
+        <TextInput
+          value={d.person ?? 'girl'}
+          onChange={(v) => update({ person: v })}
+          placeholder="girl, boy, guy, dog…"
+        />
+      </Field>
       <Field label="表情/顔">
         <Area value={d.face} onChange={(v) => update({ face: v })} placeholder="smile, blue eyes" />
       </Field>
@@ -157,7 +165,10 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
-function TagNode(kind: 'soloAction' | 'interaction' | 'background' | 'lighting' | 'style', icon: string) {
+function TagNode(
+  kind: 'soloAction' | 'interaction' | 'background' | 'lighting' | 'quality' | 'style',
+  icon: string
+) {
   return function TagNodeInner({ id, data, selected }: NodeProps<RFNode>) {
     const d = data as Extract<NodeData, { kind: typeof kind }>
     const update = useUpdate(id)
@@ -182,6 +193,7 @@ export const SoloActionNode = TagNode('soloAction', '🤸')
 export const InteractionNode = TagNode('interaction', '🤝')
 export const BackgroundNode = TagNode('background', '🏞️')
 export const LightingNode = TagNode('lighting', '💡')
+export const QualityNode = TagNode('quality', '✨')
 export const StyleNode = TagNode('style', '🎨')
 
 export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
@@ -271,6 +283,7 @@ export const nodeTypes = {
   background: BackgroundNode,
   lighting: LightingNode,
   camera: CameraNode,
+  quality: QualityNode,
   style: StyleNode,
   seed: SeedNode,
   scene: SceneNode

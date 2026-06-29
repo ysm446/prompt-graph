@@ -56,14 +56,20 @@ function dataOf<T extends NodeData['kind']>(node: GraphNode, kind: T): Extract<N
  * キャラの鎖（character → solo action → scene）を1ブロックに解決する。
  * 起点が soloAction なら上流の character を拾い、bare character ならそのまま。
  */
-function resolveCharacterChain(startId: string, g: Graph): { block: string; warning?: string } | null {
+interface ChainResult {
+  block: string
+  person?: string // 人数タグ集計用の数え名詞（character が解決できたときのみ）
+  warning?: string
+}
+
+function resolveCharacterChain(startId: string, g: Graph): ChainResult | null {
   const start = g.nodes.get(startId)
   if (!start) return null
 
   if (start.data.kind === 'character') {
     const c = start.data
     const block = characterTags(c).join(', ')
-    return { block: applyWeight(block, c.weight) }
+    return { block: applyWeight(block, c.weight), person: c.person ?? 'girl' }
   }
 
   if (start.data.kind === 'soloAction') {
@@ -82,16 +88,38 @@ function resolveCharacterChain(startId: string, g: Graph): { block: string; warn
     const parts = [...characterTags(c), ...actionTags]
     const block = parts.join(', ')
     // weight はキャラ側を優先（束ねたブロック全体に適用）
-    return { block: applyWeight(block, c.weight) }
+    return { block: applyWeight(block, c.weight), person: c.person ?? 'girl' }
   }
 
   return null
 }
 
-function autoPeopleTag(charCount: number): string | null {
-  if (charCount <= 0) return null
-  if (charCount === 1) return '1girl'
-  return '2girls' // MVP: 既定は 2girls。混在時は手動指定で上書き
+/** 英語名詞の簡易複数形化（girl→girls, fox→foxes, lady→ladies, guy→guys）。 */
+function pluralize(noun: string): string {
+  if (/(s|x|z|ch|sh)$/i.test(noun)) return `${noun}es`
+  if (/[^aeiou]y$/i.test(noun)) return `${noun.slice(0, -1)}ies`
+  return `${noun}s`
+}
+
+/**
+ * 接続キャラの数え名詞を集計して人数タグを作る（記述式）。
+ * 例: [girl, girl] → '2girls' / [girl, dog] → '1girl, 1dog' / [guy, guy] → '2guys'。
+ * 出現順を保持。空文字は数えない。
+ */
+function aggregatePeopleTag(persons: string[]): string | null {
+  const order: string[] = []
+  const counts = new Map<string, number>()
+  for (const raw of persons) {
+    const noun = raw.trim().toLowerCase()
+    if (!noun) continue
+    if (!counts.has(noun)) order.push(noun)
+    counts.set(noun, (counts.get(noun) ?? 0) + 1)
+  }
+  const tags = order.map((noun) => {
+    const n = counts.get(noun)!
+    return n === 1 ? `1${noun}` : `${n}${pluralize(noun)}`
+  })
+  return tags.length > 0 ? tags.join(', ') : null
 }
 
 /** 単一 Scene をコンパイルする。 */
@@ -103,6 +131,8 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
 
   // --- 収集 ---
   const characterBlocks: string[] = []
+  const persons: string[] = []
+  const qualities: string[] = []
   const interactions: string[] = []
   const backgrounds: string[] = []
   const lightings: string[] = []
@@ -117,6 +147,7 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
         if (r) {
           if (r.warning) warnings.push(r.warning)
           if (r.block) characterBlocks.push(r.block)
+          if (r.person) persons.push(r.person)
         }
         break
       }
@@ -136,6 +167,12 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
         const d = up.data as TagData
         const b = applyWeight(splitTags(d.tags).join(', '), d.weight)
         if (b) lightings.push(b)
+        break
+      }
+      case 'quality': {
+        const d = up.data as TagData
+        const b = applyWeight(splitTags(d.tags).join(', '), d.weight)
+        if (b) qualities.push(b)
         break
       }
       case 'style': {
@@ -161,16 +198,17 @@ export function compileScene(sceneNode: GraphNode, nodes: GraphNode[], edges: Gr
     }
   }
 
-  // --- 人数タグ（spec §6） ---
+  // --- 人数タグ（spec §6）: キャラの種別を集計して 2girls / 1girl, 1boy などにする ---
   let peopleTag: string | null = null
   if (scene) {
-    if (scene.peopleTagAuto) peopleTag = autoPeopleTag(characterBlocks.length)
+    if (scene.peopleTagAuto) peopleTag = aggregatePeopleTag(persons)
     else peopleTag = scene.peopleTag.trim() || null
   }
 
-  // --- 順序づけ（spec §5-5）: 人数 → キャラ各ブロック → interaction → background → lighting → style ---
+  // --- 順序づけ（spec §5-5）: quality(先頭) → 人数 → キャラ各ブロック → interaction → background → lighting → style ---
   const useBreak = scene?.useBreak ?? false
   const segments: string[] = []
+  segments.push(...qualities) // 品質タグはプロンプト先頭（効きを最大化）
   if (peopleTag) segments.push(peopleTag)
 
   if (useBreak && characterBlocks.length > 1) {
