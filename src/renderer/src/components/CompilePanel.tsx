@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Clapperboard } from 'lucide-react'
 import type { GraphEdge, GraphNode, NodeKind } from '@shared/types'
 import { compileScene } from '@shared/compile'
 import { useGraphStore } from '../store/graphStore'
@@ -41,8 +42,9 @@ export function CompilePanel() {
       {compiled.length === 0 && <p className="text-[#565f89]">Scene ノードを追加してください</p>}
       {compiled.map(({ scene, result }) => (
         <section key={scene.id} className="rounded border border-[#2a2e3f] p-2">
-          <div className="mb-1 font-semibold text-[#ff9e64]">
-            🎬 {scene.data.kind === 'scene' ? scene.data.label : 'Scene'}
+          <div className="mb-1 flex items-center gap-1.5 font-semibold text-[#ff9e64]">
+            <Clapperboard size={14} />
+            {scene.data.kind === 'scene' ? scene.data.label : 'Scene'}
             {result.seed && <span className="ml-2 text-[10px] text-[#565f89]">seed: {result.seed}</span>}
           </div>
 

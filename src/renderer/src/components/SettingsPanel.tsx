@@ -2,7 +2,21 @@ import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import { DEFAULT_VISIBILITY_PROMPT } from '@shared/prompts'
 
-// 設定編集パネル。現状は可視性フィルタのシステムプロンプト（編集可）。
+// コンテキスト長のスライダー刻み
+const CTX_STEPS = [4096, 8192, 16384, 32768, 65536]
+const ctxLabel = (v: number): string => `${Math.round(v / 1024)}k`
+const ctxIndex = (v: number): number => {
+  const i = CTX_STEPS.indexOf(v)
+  if (i >= 0) return i
+  // 一致しない場合は最も近い刻みへ
+  let best = 0
+  for (let k = 1; k < CTX_STEPS.length; k++) {
+    if (Math.abs(CTX_STEPS[k] - v) < Math.abs(CTX_STEPS[best] - v)) best = k
+  }
+  return best
+}
+
+// 設定編集パネル。
 export function SettingsPanel() {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [saved, setSaved] = useState(false)
@@ -38,6 +52,37 @@ export function SettingsPanel() {
         />
         システムリソースを表示（CPU / RAM / GPU）
       </label>
+
+      <label className="flex items-center gap-2 text-[11px] text-[#c0caf5]">
+        <input
+          type="checkbox"
+          checked={settings.showMinimap}
+          onChange={(e) => update({ showMinimap: e.target.checked })}
+        />
+        ミニマップを表示
+      </label>
+
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between text-[11px] text-[#c0caf5]">
+          <span>コンテキスト長</span>
+          <span className="text-[#7aa2f7]">{ctxLabel(settings.contextSize)}</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={CTX_STEPS.length - 1}
+          step={1}
+          value={ctxIndex(settings.contextSize)}
+          onChange={(e) => update({ contextSize: CTX_STEPS[Number(e.target.value)] })}
+        />
+        <div className="flex justify-between text-[9px] text-[#565f89]">
+          {CTX_STEPS.map((v) => (
+            <span key={v}>{ctxLabel(v)}</span>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#565f89]">※ 次回モデルロード時に反映されます。</p>
+      </div>
+
       <div className="h-px bg-[#2a2e3f]" />
 
       <div className="flex items-center justify-between">

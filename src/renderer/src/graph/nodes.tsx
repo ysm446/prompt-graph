@@ -1,5 +1,21 @@
 import { Handle, NodeResizeControl, Position, type NodeProps } from '@xyflow/react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  Boxes,
+  Camera as CameraIcon,
+  Clapperboard,
+  Dices,
+  Handshake,
+  Image as ImageIcon,
+  Lightbulb,
+  type LucideIcon,
+  Mountain,
+  Palette,
+  PersonStanding,
+  Sparkles,
+  User,
+  X
+} from 'lucide-react'
 import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
 import { getVisibilityInput, visibilityHash } from '@shared/compile'
 import { dryRun, findSceneForBatch, type DryRunResult } from '@shared/batch'
@@ -20,6 +36,21 @@ const ACCENT: Record<NodeKind, string> = {
   reference: '#7dcfff',
   scene: '#ff9e64',
   batch: '#f7768e'
+}
+
+const NODE_ICONS: Record<NodeKind, LucideIcon> = {
+  character: User,
+  soloAction: PersonStanding,
+  interaction: Handshake,
+  background: Mountain,
+  lighting: Lightbulb,
+  camera: CameraIcon,
+  quality: Sparkles,
+  style: Palette,
+  seed: Dices,
+  reference: ImageIcon,
+  scene: Clapperboard,
+  batch: Boxes
 }
 
 function useUpdate(id: string) {
@@ -78,9 +109,13 @@ function Shell({
         <NodeResizeControl position="bottom-right" minWidth={180} minHeight={80} maxWidth={680} />
       )}
       <div
-        className="shrink-0 rounded-t-lg px-3 py-1.5 text-xs font-semibold tracking-wide"
+        className="flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-1.5 text-xs font-semibold tracking-wide"
         style={{ background: accent, color: '#11131a' }}
       >
+        {(() => {
+          const Icon = NODE_ICONS[kind]
+          return <Icon size={14} strokeWidth={2.25} />
+        })()}
         {title}
       </div>
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">{children}</div>
@@ -170,7 +205,7 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'character' }>
   const update = useUpdate(id)
   return (
-    <Shell id={id} kind="character" title={`👤 ${d.label}`} selected={selected}>
+    <Shell id={id} kind="character" title={d.label} selected={selected}>
       <Field label="数え名詞 (人数タグ集計用 / 空で無効)">
         <TextInput
           value={d.person ?? 'girl'}
@@ -203,16 +238,13 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
-function TagNode(
-  kind: 'soloAction' | 'interaction' | 'background' | 'lighting' | 'quality' | 'style',
-  icon: string
-) {
+function TagNode(kind: 'soloAction' | 'interaction' | 'background' | 'lighting' | 'quality' | 'style') {
   return function TagNodeInner({ id, data, selected }: NodeProps<RFNode>) {
     const d = data as Extract<NodeData, { kind: typeof kind }>
     const update = useUpdate(id)
     const inputs = kind === 'soloAction' ? [{ id: 'charIn', label: 'Character', top: 36 }] : undefined
     return (
-      <Shell id={id} kind={kind} title={`${icon} ${d.label}`} selected={selected} inputs={inputs}>
+      <Shell id={id} kind={kind} title={d.label} selected={selected} inputs={inputs}>
         {kind === 'soloAction' && (
           <p className="text-[10px] text-[#565f89]">← Character を接続（鎖: char → action → scene）</p>
         )}
@@ -227,19 +259,19 @@ function TagNode(
   }
 }
 
-export const SoloActionNode = TagNode('soloAction', '🤸')
-export const InteractionNode = TagNode('interaction', '🤝')
-export const BackgroundNode = TagNode('background', '🏞️')
-export const LightingNode = TagNode('lighting', '💡')
-export const QualityNode = TagNode('quality', '✨')
-export const StyleNode = TagNode('style', '🎨')
+export const SoloActionNode = TagNode('soloAction')
+export const InteractionNode = TagNode('interaction')
+export const BackgroundNode = TagNode('background')
+export const LightingNode = TagNode('lighting')
+export const QualityNode = TagNode('quality')
+export const StyleNode = TagNode('style')
 
 export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'camera' }>
   const update = useUpdate(id)
   const lines = d.presets.split('\n').map((l) => l.trim()).filter(Boolean)
   return (
-    <Shell id={id} kind="camera" title={`🎥 ${d.label}`} selected={selected}>
+    <Shell id={id} kind="camera" title={d.label} selected={selected}>
       <Field label="presets (1行=1プリセット)">
         <Area value={d.presets} onChange={(v) => update({ presets: v })} />
       </Field>
@@ -273,7 +305,7 @@ export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
     />
   )
   return (
-    <Shell id={id} kind="seed" title={`🎲 ${d.label}`} selected={selected}>
+    <Shell id={id} kind="seed" title={d.label} selected={selected}>
       <Field label="モード">
         <select
           className={inputCls}
@@ -394,11 +426,11 @@ function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
             {removed.map((t) => (
               <button
                 key={t}
-                className="nodrag rounded bg-[#2a2e3f] px-1.5 py-0.5 text-[10px] text-[#f7768e] hover:bg-[#3a3f55]"
+                className="nodrag flex items-center gap-1 rounded bg-[#2a2e3f] px-1.5 py-0.5 text-[10px] text-[#f7768e] hover:bg-[#3a3f55]"
                 title="クリックで除去を取り消す"
                 onClick={() => update({ visibilityRemoved: removed.filter((x) => x !== t) })}
               >
-                {t} ✕
+                {t} <X size={10} />
               </button>
             ))}
           </div>
@@ -428,7 +460,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
   return (
-    <Shell id={id} kind="scene" title={`🎬 ${d.label}`} selected={selected}>
+    <Shell id={id} kind="scene" title={d.label} selected={selected}>
       {/* カテゴリ別入力ピン（誤接続防止 + 見やすさ） */}
       <div className="-mx-3 mb-1 border-b border-[#2a2e3f] pb-1">
         {SCENE_INPUTS.map((pin) => (
@@ -559,7 +591,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
   const fileName = d.imagePath ? d.imagePath.replace(/^.*[\\/]/, '') : ''
 
   return (
-    <Shell id={id} kind="reference" title={`🖼️ ${d.label}`} selected={selected} hasOutput={false}>
+    <Shell id={id} kind="reference" title={d.label} selected={selected} hasOutput={false}>
       <button
         className="nodrag rounded bg-[#2a2e3f] py-1 text-xs hover:bg-[#3a3f55]"
         onClick={load}
@@ -630,7 +662,7 @@ export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
     <Shell
       id={id}
       kind="batch"
-      title={`📦 ${d.label}`}
+      title={d.label}
       selected={selected}
       hasOutput={false}
       inputs={[{ id: 'scene', label: 'Scene', top: 36 }]}

@@ -9,6 +9,7 @@ import {
   type OnSelectionChangeParams
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
 import { nodeTypes } from './graph/nodes'
 import { NODE_LABELS, SCENE_INPUTS } from './graph/factory'
@@ -54,10 +55,10 @@ function AddNodePanel() {
   return (
     <div className="relative">
       <button
-        className="rounded border border-[#2a2e3f] bg-[#1a1b26] px-2 py-1 text-xs text-[#c0caf5] hover:border-[#7aa2f7]"
+        className="flex items-center gap-1 rounded border border-[#2a2e3f] bg-[#1a1b26] px-2 py-1 text-xs text-[#c0caf5] hover:border-[#7aa2f7]"
         onClick={() => setOpen((v) => !v)}
       >
-        ＋ ノード追加 ▾
+        <Plus size={14} /> ノード追加 <ChevronDown size={12} />
       </button>
       {open && (
         <div className="absolute left-0 top-full mt-1 min-w-40 rounded-md border border-[#2a2e3f] bg-[#1a1b26] py-1 text-xs shadow-2xl">
@@ -87,6 +88,17 @@ function Canvas() {
   const addNode = useGraphStore((s) => s.addNode)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<Menu | null>(null)
+  const [showMinimap, setShowMinimap] = useState(true)
+
+  // 設定（ミニマップ表示）を読み込み、保存時の pg-settings で更新
+  useEffect(() => {
+    const load = (): void => {
+      window.api.getSettings().then((s) => setShowMinimap(s.showMinimap))
+    }
+    load()
+    window.addEventListener('pg-settings', load)
+    return () => window.removeEventListener('pg-settings', load)
+  }, [])
 
   const onSelectionChange = useCallback(
     (p: OnSelectionChangeParams) => setSelected(p.nodes[0]?.id ?? null),
@@ -171,14 +183,16 @@ function Canvas() {
           <AddNodePanel />
         </Panel>
         <Background color="#2a2e3f" gap={20} />
-        <MiniMap
-          pannable
-          zoomable
-          bgColor="#16171f"
-          maskColor="rgba(15,17,21,0.6)"
-          nodeColor="#2a2e3f"
-          nodeStrokeColor="#3a3f55"
-        />
+        {showMinimap && (
+          <MiniMap
+            pannable
+            zoomable
+            bgColor="#16171f"
+            maskColor="rgba(15,17,21,0.6)"
+            nodeColor="#2a2e3f"
+            nodeStrokeColor="#3a3f55"
+          />
+        )}
       </ReactFlow>
 
       {menu && (
@@ -212,13 +226,13 @@ function Canvas() {
                   {menu.label}
                 </div>
                 <button
-                  className="block w-full px-3 py-1.5 text-left text-[#f7768e] hover:bg-[#2a2e3f]"
+                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[#f7768e] hover:bg-[#2a2e3f]"
                   onClick={() => {
                     removeNode(menu.nodeId)
                     setMenu(null)
                   }}
                 >
-                  🗑 削除
+                  <Trash2 size={13} /> 削除
                 </button>
               </>
             )}

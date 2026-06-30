@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, RefreshCw, Settings } from 'lucide-react'
 import type { LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
 import { RuntimeInstall } from './RuntimeInstall'
 import { SettingsPanel } from './SettingsPanel'
@@ -110,7 +111,7 @@ export function ModelBar() {
         ) : (
           models.map((m) => (
             <option key={m.path} value={m.path}>
-              {m.fileName} {m.quant ?? ''} {m.hasVision ? '👁' : ''}
+              {m.fileName} {m.quant ?? ''} {m.hasVision ? '· vision' : ''}
             </option>
           ))
         )}
@@ -120,7 +121,7 @@ export function ModelBar() {
         onClick={refreshModels}
         title="モデル一覧を再読込"
       >
-        ⟳
+        <RefreshCw size={14} />
       </button>
 
       {/* load / eject */}
@@ -148,12 +149,13 @@ export function ModelBar() {
       <div className="flex flex-1 items-center justify-end">
         <div className="relative" ref={runtimeRef}>
           <button
-            className={`rounded border px-2 py-1 ${
+            className={`flex items-center gap-1 rounded border px-2 py-1 ${
               install ? 'border-[#2a2e3f] text-[#c0caf5]' : 'border-[#e0af68] text-[#e0af68]'
             } hover:border-[#7aa2f7]`}
             onClick={() => setShowRuntime((v) => !v)}
           >
-            {install ? '⚙ ランタイム' : '⚠ ランタイム未導入'}
+            {install ? <Settings size={13} /> : <AlertTriangle size={13} />}
+            {install ? 'ランタイム' : 'ランタイム未導入'}
           </button>
           {showRuntime && (
             <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">
@@ -165,11 +167,11 @@ export function ModelBar() {
         {/* settings */}
         <div className="relative" ref={settingsRef}>
           <button
-            className="rounded border border-[#2a2e3f] px-2 py-1 hover:border-[#7aa2f7]"
+            className="flex items-center rounded border border-[#2a2e3f] px-2 py-1 hover:border-[#7aa2f7]"
             onClick={() => setShowSettings((v) => !v)}
             title="設定"
           >
-            ⚙
+            <Settings size={14} />
           </button>
           {showSettings && (
             <div className="absolute right-0 top-full z-50 mt-1 rounded-md border border-[#2a2e3f] bg-[#1a1b26] p-3 shadow-2xl">

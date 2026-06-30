@@ -162,6 +162,7 @@ export interface AppSettings {
   contextSize: number
   visibilityPrompt: string // 可視性フィルタのシステムプロンプト（編集可）
   showResources: boolean // システムリソース表示のオンオフ
+  showMinimap: boolean // ミニマップ表示のオンオフ
 }
 
 export interface SystemResources {

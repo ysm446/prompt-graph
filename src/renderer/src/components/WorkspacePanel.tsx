@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus, Save, X } from 'lucide-react'
 import { useGraphStore } from '../store/graphStore'
 
 export function WorkspacePanel() {
@@ -31,11 +32,11 @@ export function WorkspacePanel() {
           ワークスペース
         </span>
         <button
-          className="rounded border border-[#2a2e3f] px-1.5 leading-5 hover:border-[#7aa2f7]"
+          className="flex items-center rounded border border-[#2a2e3f] p-1 hover:border-[#7aa2f7]"
           onClick={() => void createWorkspace()}
           title="新規ワークスペース"
         >
-          ＋
+          <Plus size={14} />
         </button>
       </div>
 
@@ -79,7 +80,7 @@ export function WorkspacePanel() {
 
               {/* 保存ボタン（各ワークスペースに表示。編集中のアクティブのみ有効） */}
               <button
-                className={`rounded px-1 ${
+                className={`flex items-center rounded p-1 ${
                   isActive
                     ? dirty
                       ? 'text-[#7aa2f7] hover:bg-[#3a3f55]'
@@ -90,18 +91,18 @@ export function WorkspacePanel() {
                 disabled={!isActive}
                 title={isActive ? '保存' : '（アクティブなワークスペースのみ保存）'}
               >
-                💾
+                <Save size={13} />
               </button>
 
               {/* 削除 */}
               <button
-                className="rounded px-1 text-[#565f89] opacity-0 hover:bg-[#3a3f55] hover:text-[#f7768e] group-hover:opacity-100"
+                className="flex items-center rounded p-1 text-[#565f89] opacity-0 hover:bg-[#3a3f55] hover:text-[#f7768e] group-hover:opacity-100"
                 onClick={() => {
                   if (confirm(`「${displayName}」を削除しますか？`)) void deleteWorkspace(ws.id)
                 }}
                 title="削除"
               >
-                ✕
+                <X size={13} />
               </button>
             </div>
           )

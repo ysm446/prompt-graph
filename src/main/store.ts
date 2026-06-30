@@ -16,7 +16,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   selectedModelPath: null,
   contextSize: 4096,
   visibilityPrompt: DEFAULT_VISIBILITY_PROMPT,
-  showResources: false
+  showResources: false,
+  showMinimap: true
 }
 
 export class Store {
