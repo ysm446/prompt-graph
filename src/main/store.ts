@@ -6,6 +6,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/p
 import { dirname, join } from 'node:path'
 import type {
   AppSettings,
+  ForgeInstall,
   LlamaInstall,
   ProjectSnapshot,
   WorkspaceMeta
@@ -18,7 +19,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   visibilityPrompt: DEFAULT_VISIBILITY_PROMPT,
   showResources: false,
   showMinimap: true,
-  snapToGrid: false
+  snapToGrid: false,
+  forgeHost: '127.0.0.1',
+  forgePort: 7861
 }
 
 export class Store {
@@ -63,6 +66,14 @@ export class Store {
   }
   saveLlamaInstall(install: LlamaInstall): Promise<void> {
     return this.writeJson(this.path('llama.json'), install)
+  }
+
+  // --- forge install ---
+  getForgeInstall(): Promise<ForgeInstall | null> {
+    return this.readJson<ForgeInstall | null>(this.path('forge.json'), null)
+  }
+  saveForgeInstall(install: ForgeInstall): Promise<void> {
+    return this.writeJson(this.path('forge.json'), install)
   }
 
   // --- workspaces ---

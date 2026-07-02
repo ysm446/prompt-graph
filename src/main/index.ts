@@ -3,11 +3,14 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { IPC, type AppPaths } from '../shared/ipc'
 import type {
   AppSettings,
+  ForgeInstallProgress,
   LlamaInstallProgress,
   LlamaReleaseVariant,
   ProjectSnapshot
 } from '../shared/types'
 import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
+import { cloneForge, isForgeCloned } from './forgeInstaller'
+import { ForgeServerManager } from './forgeServer'
 import { runDecompose, runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
 import { readImageDataUrl, readImageMetadata } from './pngMeta'
@@ -19,12 +22,15 @@ const ROOT = app.isPackaged ? app.getPath('userData') : process.cwd()
 const PATHS: AppPaths = {
   modelsDir: join(process.cwd(), 'models'), // モデルは常にリポジトリの models/ を参照
   dataDir: join(ROOT, 'data'),
-  runtimeDir: join(ROOT, 'bin', 'llama-runtime')
+  runtimeDir: join(ROOT, 'runtime', 'llama-server'),
+  forgeDir: join(ROOT, 'runtime', 'stable-diffusion-webui-forge')
 }
 
 const store = new Store(PATHS.dataDir)
 const server = new LlamaServerManager()
+const forge = new ForgeServerManager()
 let installAbort: AbortController | null = null
+let forgeInstallAbort: AbortController | null = null
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -42,6 +48,12 @@ function createWindow(): void {
   server.setListener((status) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IPC.evtServerStatus, status)
+    }
+  })
+
+  forge.setListener((status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC.evtForgeStatus, status)
     }
   })
 
@@ -135,6 +147,64 @@ function registerIpc(): void {
     return runDecompose(status.baseUrl, positive)
   })
 
+  // --- WebUI Forge ---
+  ipcMain.handle(IPC.forgeGetInstall, async () => {
+    const install = await store.getForgeInstall()
+    // 記録があっても実体（webui.bat）が無ければ未インストール扱い。
+    if (install && !isForgeCloned(install.path)) return null
+    if (!install && isForgeCloned(PATHS.forgeDir)) {
+      // 手動配置などで記録が無い場合は補完する。
+      const rec = { path: PATHS.forgeDir, clonedAt: new Date().toISOString() }
+      await store.saveForgeInstall(rec)
+      return rec
+    }
+    return install
+  })
+
+  ipcMain.handle(IPC.forgeInstall, async (e) => {
+    forgeInstallAbort?.abort()
+    forgeInstallAbort = new AbortController()
+    const onProgress = (p: ForgeInstallProgress): void => {
+      e.sender.send(IPC.evtForgeInstallProgress, p)
+    }
+    try {
+      const result = await cloneForge({
+        forgeDir: PATHS.forgeDir,
+        onProgress,
+        signal: forgeInstallAbort.signal
+      })
+      const install = { path: result.path, clonedAt: new Date().toISOString() }
+      await store.saveForgeInstall(install)
+      return install
+    } catch (err) {
+      onProgress({ phase: 'error', message: (err as Error).message })
+      throw err
+    } finally {
+      forgeInstallAbort = null
+    }
+  })
+
+  ipcMain.handle(IPC.forgeInstallCancel, () => {
+    forgeInstallAbort?.abort()
+    forgeInstallAbort = null
+  })
+
+  ipcMain.handle(IPC.forgeStart, async () => {
+    const install = await store.getForgeInstall()
+    const forgeDir = install?.path ?? PATHS.forgeDir
+    if (!isForgeCloned(forgeDir)) throw new Error('WebUI Forge がインストールされていません')
+    const settings = await store.getSettings()
+    return forge.start({
+      forgeDir,
+      host: settings.forgeHost,
+      port: settings.forgePort,
+      logPath: join(PATHS.dataDir, 'forge_server.log')
+    })
+  })
+
+  ipcMain.handle(IPC.forgeStop, () => forge.stop())
+  ipcMain.handle(IPC.forgeStatus, () => forge.getStatus())
+
   ipcMain.handle(IPC.dialogOpenImage, async () => {
     const opts = {
       title: '参照画像を選択',
@@ -163,11 +233,13 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   server.stop()
+  forge.stop()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
   server.stop()
+  forge.stop()
 })
 
 // 外部リンクは既定ブラウザで開く

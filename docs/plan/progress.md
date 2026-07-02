@@ -79,7 +79,7 @@
 ### 注意点
 
 - 文字コードは UTF-8 (BOM なし) を厳守（日本語多用）。
-- bin/ と data/ は git 管理外（.gitignore）。models/ の *.gguf も管理外。
+- runtime/ と data/ は git 管理外（.gitignore）。models/ の *.gguf も管理外。
 - models/ に gemma-4-E4B-it-GGUF（Q4_K_M ＋ mmproj、vision対応）が既配置。
 - main/preload は CJS 出力（`"type":"module"` 不使用）。config 類は `module.exports`。
 - 統合ターミナルでは `ELECTRON_RUN_AS_NODE` を解除してから `npm run dev`。

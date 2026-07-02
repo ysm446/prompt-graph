@@ -164,6 +164,8 @@ export interface AppSettings {
   showResources: boolean // システムリソース表示のオンオフ
   showMinimap: boolean // ミニマップ表示のオンオフ
   snapToGrid: boolean // ノードの移動・リサイズをグリッドにスナップ
+  forgeHost: string // WebUI Forge のホスト
+  forgePort: number // WebUI Forge のポート
 }
 
 export interface SystemResources {
@@ -239,5 +241,29 @@ export interface LlamaServerStatus {
   state: LlamaServerState
   baseUrl: string | null
   modelPath: string | null
+  message: string | null
+}
+
+// ============================================================
+// WebUI Forge（stable-diffusion-webui-forge）
+// image-assistant の sd_process.py 相当を TS へ移植。
+// ============================================================
+
+// git clone の進捗。git の stderr（"Receiving objects: 42%"）をパースして通知。
+export type ForgeInstallProgress =
+  | { phase: 'clone'; label: string; percent: number | null }
+  | { phase: 'done'; path: string }
+  | { phase: 'error'; message: string }
+
+export interface ForgeInstall {
+  path: string // stable-diffusion-webui-forge ディレクトリの絶対パス
+  clonedAt: string
+}
+
+export type ForgeServerState = 'stopped' | 'starting' | 'running' | 'error'
+
+export interface ForgeServerStatus {
+  state: ForgeServerState
+  url: string | null
   message: string | null
 }

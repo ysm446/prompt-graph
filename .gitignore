@@ -5,7 +5,7 @@ dist/
 *.tsbuildinfo
 
 # runtime / user data (downloaded llama.cpp, project saves)
-bin/
+runtime/
 data/
 
 # large model weights (kept locally, not committed)

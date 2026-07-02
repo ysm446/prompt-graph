@@ -19,17 +19,26 @@ export const IPC = {
   llamaStatus: 'llama:status',
   llamaVisibility: 'llama:visibility',
   llamaDecompose: 'llama:decompose',
+  forgeGetInstall: 'forge:get-install',
+  forgeInstall: 'forge:install',
+  forgeInstallCancel: 'forge:install-cancel',
+  forgeStart: 'forge:start',
+  forgeStop: 'forge:stop',
+  forgeStatus: 'forge:status',
   dialogOpenImage: 'dialog:open-image',
   imageMetadata: 'image:metadata',
   imageDataUrl: 'image:dataurl',
   systemResources: 'system:resources',
   // main -> renderer events
   evtInstallProgress: 'llama:install-progress',
-  evtServerStatus: 'llama:server-status'
+  evtServerStatus: 'llama:server-status',
+  evtForgeInstallProgress: 'forge:install-progress',
+  evtForgeStatus: 'forge:server-status'
 } as const
 
 export interface AppPaths {
   modelsDir: string
   dataDir: string
   runtimeDir: string
+  forgeDir: string
 }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ChevronDown, Cpu, Loader2, RefreshCw, Settings } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Cpu, ImageIcon, Loader2, RefreshCw, Settings } from 'lucide-react'
 import type { LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
 import { RuntimeInstall } from './RuntimeInstall'
+import { ForgePanel } from './ForgePanel'
 import { SettingsPanel } from './SettingsPanel'
 
 function formatSize(bytes: number): string {
@@ -23,9 +24,11 @@ export function ModelBar() {
   const [busy, setBusy] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showRuntime, setShowRuntime] = useState(false)
+  const [showForge, setShowForge] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const runtimeRef = useRef<HTMLDivElement>(null)
+  const forgeRef = useRef<HTMLDivElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,6 +47,16 @@ export function ModelBar() {
     window.addEventListener('mousedown', onClick)
     return () => window.removeEventListener('mousedown', onClick)
   }, [showRuntime])
+
+  // Forge ポップオーバーの外側クリックで閉じる
+  useEffect(() => {
+    if (!showForge) return
+    const onClick = (e: MouseEvent) => {
+      if (forgeRef.current && !forgeRef.current.contains(e.target as Node)) setShowForge(false)
+    }
+    window.addEventListener('mousedown', onClick)
+    return () => window.removeEventListener('mousedown', onClick)
+  }, [showForge])
 
   // 設定ポップオーバーの外側クリックで閉じる
   useEffect(() => {
@@ -165,6 +178,22 @@ export function ModelBar() {
           {showRuntime && (
             <div className="absolute right-0 top-full z-50 mt-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] p-3 shadow-2xl">
               <RuntimeInstall onInstalled={(i) => setInstall(i)} />
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={forgeRef}>
+          <button
+            className="flex items-center gap-1 rounded-[8px] border border-[var(--border-strong)] px-2 py-1 text-[var(--text-dim)] transition hover:bg-white/5 hover:text-[var(--text)]"
+            onClick={() => setShowForge((v) => !v)}
+            title="WebUI Forge"
+          >
+            <ImageIcon size={13} />
+            Forge
+          </button>
+          {showForge && (
+            <div className="absolute right-0 top-full z-50 mt-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] p-3 shadow-2xl">
+              <ForgePanel />
             </div>
           )}
         </div>

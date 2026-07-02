@@ -2,6 +2,9 @@
 import type { AppPaths } from './ipc'
 import type {
   AppSettings,
+  ForgeInstall,
+  ForgeInstallProgress,
+  ForgeServerStatus,
   LlamaInstall,
   LlamaInstallProgress,
   LlamaModel,
@@ -45,6 +48,14 @@ export interface PromptGraphApi {
   getServerStatus(): Promise<LlamaServerStatus>
   visibilityFilter(framing: string | null, tags: string[]): Promise<string[]>
   decompose(positive: string): Promise<ReferenceBuckets>
+
+  getForgeInstall(): Promise<ForgeInstall | null>
+  installForge(): Promise<ForgeInstall>
+  cancelForgeInstall(): Promise<void>
+  startForge(): Promise<ForgeServerStatus>
+  stopForge(): Promise<void>
+  getForgeStatus(): Promise<ForgeServerStatus>
+
   openImageDialog(): Promise<string | null>
   imageMetadata(path: string): Promise<ImageMetadata>
   imageDataUrl(path: string): Promise<string>
@@ -52,4 +63,6 @@ export interface PromptGraphApi {
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void
   onServerStatus(cb: (s: LlamaServerStatus) => void): () => void
+  onForgeInstallProgress(cb: (p: ForgeInstallProgress) => void): () => void
+  onForgeStatus(cb: (s: ForgeServerStatus) => void): () => void
 }

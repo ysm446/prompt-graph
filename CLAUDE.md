@@ -36,7 +36,7 @@ src/
   preload/   contextBridge による IPC 公開
   renderer/  React + React Flow の UI（ノード, Scene コンパイル）
 models/      ユーザ配置の GGUF（例: gemma-4-E4B-it-GGUF, mmproj 同梱でvision対応）
-bin/         自動DLした llama.cpp ランタイム（git 管理外）
+runtime/     自動DLしたランタイム（git 管理外）。llama-server/ に llama.cpp、stable-diffusion-webui-forge/ に WebUI Forge
 data/        プロジェクト保存・設定（git 管理外）
 docs/        spec.md, plan/, changelog.md
 ```

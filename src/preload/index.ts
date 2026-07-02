@@ -4,6 +4,9 @@ import type { ImageMetadata, PromptGraphApi } from '../shared/api'
 import type { ReferenceBuckets, SystemResources } from '../shared/types'
 import type {
   AppSettings,
+  ForgeInstall,
+  ForgeInstallProgress,
+  ForgeServerStatus,
   LlamaInstall,
   LlamaInstallProgress,
   LlamaModel,
@@ -48,6 +51,14 @@ const api: PromptGraphApi = {
     ipcRenderer.invoke(IPC.llamaVisibility, framing, tags),
   decompose: (positive: string): Promise<ReferenceBuckets> =>
     ipcRenderer.invoke(IPC.llamaDecompose, positive),
+
+  getForgeInstall: (): Promise<ForgeInstall | null> => ipcRenderer.invoke(IPC.forgeGetInstall),
+  installForge: (): Promise<ForgeInstall> => ipcRenderer.invoke(IPC.forgeInstall),
+  cancelForgeInstall: (): Promise<void> => ipcRenderer.invoke(IPC.forgeInstallCancel),
+  startForge: (): Promise<ForgeServerStatus> => ipcRenderer.invoke(IPC.forgeStart),
+  stopForge: (): Promise<void> => ipcRenderer.invoke(IPC.forgeStop),
+  getForgeStatus: (): Promise<ForgeServerStatus> => ipcRenderer.invoke(IPC.forgeStatus),
+
   openImageDialog: (): Promise<string | null> => ipcRenderer.invoke(IPC.dialogOpenImage),
   imageMetadata: (path: string): Promise<ImageMetadata> =>
     ipcRenderer.invoke(IPC.imageMetadata, path),
@@ -63,6 +74,16 @@ const api: PromptGraphApi = {
     const handler = (_e: unknown, s: LlamaServerStatus): void => cb(s)
     ipcRenderer.on(IPC.evtServerStatus, handler)
     return () => ipcRenderer.removeListener(IPC.evtServerStatus, handler)
+  },
+  onForgeInstallProgress: (cb: (p: ForgeInstallProgress) => void): (() => void) => {
+    const handler = (_e: unknown, p: ForgeInstallProgress): void => cb(p)
+    ipcRenderer.on(IPC.evtForgeInstallProgress, handler)
+    return () => ipcRenderer.removeListener(IPC.evtForgeInstallProgress, handler)
+  },
+  onForgeStatus: (cb: (s: ForgeServerStatus) => void): (() => void) => {
+    const handler = (_e: unknown, s: ForgeServerStatus): void => cb(s)
+    ipcRenderer.on(IPC.evtForgeStatus, handler)
+    return () => ipcRenderer.removeListener(IPC.evtForgeStatus, handler)
   }
 }
 
