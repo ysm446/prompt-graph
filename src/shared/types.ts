@@ -166,6 +166,7 @@ export interface AppSettings {
   snapToGrid: boolean // ノードの移動・リサイズをグリッドにスナップ
   forgeHost: string // WebUI Forge のホスト
   forgePort: number // WebUI Forge のポート
+  forgePython: string // Forge 用 Python 3.10 の実行パス/コマンド（空なら自動検出）
 }
 
 export interface SystemResources {

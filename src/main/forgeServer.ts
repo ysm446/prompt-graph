@@ -1,9 +1,44 @@
 // WebUI Forge プロセスの起動・停止・ヘルスチェック。
 // image-assistant の sd_process.py を TS へ移植（webui.bat を起動し HTTP readiness を待つ）。
-import { spawn, type ChildProcess } from 'node:child_process'
-import { createWriteStream, existsSync, type WriteStream } from 'node:fs'
-import { join } from 'node:path'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
+import { createWriteStream, existsSync, writeFileSync, type WriteStream } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { ForgeServerStatus } from '../shared/types'
+
+function run(cmd: string, args: string[]): Promise<{ code: number; stdout: string }> {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { windowsHide: true }, (err, stdout) => {
+      resolve({ code: err ? ((err as { code?: number }).code ?? 1) : 0, stdout: String(stdout) })
+    })
+  })
+}
+
+// py ランチャで指定タグの python 実体パスを取得する。
+async function pyExecutable(tagArgs: string[]): Promise<string | null> {
+  const r = await run('py', [...tagArgs, '-c', 'import sys;print(sys.executable)'])
+  const out = r.stdout.trim()
+  return r.code === 0 && out ? out : null
+}
+
+// Forge が要求する Python 3.10 の実行ファイルを探す。
+// PATH の python は Windows Store のダミーのことがあるため py ランチャ経由で解決する。
+export async function resolvePython310(): Promise<string | null> {
+  // 1) 標準タグ
+  for (const args of [['-3.10'], ['-3.10-64']]) {
+    const exe = await pyExecutable(args)
+    if (exe) return exe
+  }
+  // 2) py --list を解析して 3.10 系タグ（例: Astral/CPython3.10.18）を拾う
+  const list = await run('py', ['--list'])
+  for (const line of list.stdout.split(/\r?\n/)) {
+    if (!/3\.10/.test(line)) continue
+    const m = line.match(/-V:(\S+)/)
+    if (!m) continue
+    const exe = await pyExecutable([`-V:${m[1]}`])
+    if (exe) return exe
+  }
+  return null
+}
 
 // 初回起動は venv 構築・torch DL が走るため非常に長い（分単位）。
 const READY_TIMEOUT_MS = 20 * 60 * 1000
@@ -24,6 +59,7 @@ export interface ForgeStartOptions {
   host: string
   port: number
   logPath: string
+  pythonPath?: string // 設定で明示指定された Python（空なら自動検出）
 }
 
 export class ForgeServerManager {
@@ -69,15 +105,39 @@ export class ForgeServerManager {
     // Electron 由来のフラグが webui.bat の python 判定を邪魔しないよう除去。
     delete env.ELECTRON_RUN_AS_NODE
     delete env.VIRTUAL_ENV
-    // Forge の venv があれば優先。無ければ py ランチャに委ねる。
+    // Forge の venv があれば最優先。無ければ Python 3.10 を明示指定する
+    // （PATH の python は Windows Store のダミーで失敗するため）。
     const forgeVenvPython = join(opts.forgeDir, 'venv', 'Scripts', 'python.exe')
     if (existsSync(forgeVenvPython)) {
       env.VENV_DIR = join(opts.forgeDir, 'venv')
       env.PYTHON = forgeVenvPython
+    } else {
+      const python = opts.pythonPath?.trim() || (await resolvePython310())
+      if (!python) {
+        this.closeLog()
+        this.update({ state: 'stopped', url: null, message: null })
+        throw new Error(
+          'Python 3.10 が見つかりません。Python 3.10 をインストールするか、設定で Python パスを指定してください。'
+        )
+      }
+      env.PYTHON = python
     }
     env.TORCH_INDEX_URL ??= 'https://download.pytorch.org/whl/cu128'
     env.TORCH_COMMAND ??=
       'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128'
+
+    // setuptools 81 で pkg_resources が削除され、CLIP 等の古い setup.py が
+    // ビルドできなくなるため、ビルド時 setuptools を 81 未満に固定する。
+    // （PIP_CONSTRAINT は分離ビルドの依存にも適用される）
+    if (!env.PIP_CONSTRAINT) {
+      const constraintFile = join(dirname(opts.logPath), 'pip-constraints.txt')
+      try {
+        writeFileSync(constraintFile, 'setuptools<81\n', 'utf-8')
+        env.PIP_CONSTRAINT = constraintFile
+      } catch {
+        /* 書けなくても致命ではない */
+      }
+    }
 
     const args = [
       '/c',
@@ -96,6 +156,9 @@ export class ForgeServerManager {
       env
     })
     this.child = child
+    // stdin を閉じておくと webui.bat の `pause`（エラー時のキー入力待ち）が
+    // 即 EOF で抜け、プロセスが終了 → エラー状態を検知できる（無限「起動中」を防ぐ）。
+    child.stdin?.end()
     child.stdout?.on('data', (d) => this.logFh?.write(d))
     child.stderr?.on('data', (d) => this.logFh?.write(d))
     child.on('exit', (code) => {

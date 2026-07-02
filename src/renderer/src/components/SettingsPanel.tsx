@@ -94,6 +94,24 @@ export function SettingsPanel() {
 
       <div className="h-px bg-[#2a2e3f]" />
 
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] uppercase tracking-wide text-[#565f89]">
+          WebUI Forge 用 Python パス（任意）
+        </span>
+        <input
+          type="text"
+          className="rounded border border-[#2a2e3f] bg-[#11131a] px-2 py-1 text-[11px] text-[#c0caf5] outline-none focus:border-[#7aa2f7]"
+          placeholder="空なら自動検出（Python 3.10 を推奨）"
+          value={settings.forgePython}
+          onChange={(e) => update({ forgePython: e.target.value })}
+        />
+        <p className="text-[10px] text-[#565f89]">
+          ※ 初回起動で python が見つからない場合に python.exe のパスを指定してください。
+        </p>
+      </div>
+
+      <div className="h-px bg-[#2a2e3f]" />
+
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-wide text-[#565f89]">
           可視性フィルタ システムプロンプト

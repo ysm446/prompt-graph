@@ -198,7 +198,8 @@ function registerIpc(): void {
       forgeDir,
       host: settings.forgeHost,
       port: settings.forgePort,
-      logPath: join(PATHS.dataDir, 'forge_server.log')
+      logPath: join(PATHS.dataDir, 'forge_server.log'),
+      pythonPath: settings.forgePython
     })
   })
 

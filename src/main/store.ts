@@ -21,7 +21,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   showMinimap: true,
   snapToGrid: false,
   forgeHost: '127.0.0.1',
-  forgePort: 7861
+  forgePort: 7861,
+  forgePython: ''
 }
 
 export class Store {
