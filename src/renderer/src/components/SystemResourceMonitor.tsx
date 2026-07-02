@@ -9,11 +9,11 @@ function Bar({ label, percent, detail }: { label: string; percent: number; detai
   const color = percent > 85 ? '#f7768e' : percent > 60 ? '#e0af68' : '#9ece6a'
   return (
     <div className="flex items-center gap-1.5">
-      <span className="w-7 text-[9px] text-[#565f89]">{label}</span>
-      <div className="h-1.5 w-16 overflow-hidden rounded bg-[#2a2e3f]">
-        <div className="h-full rounded" style={{ width: `${percent}%`, background: color }} />
+      <span className="w-9 text-[9px] text-[#565f89]">{label}</span>
+      <div className="h-[3px] w-16 overflow-hidden rounded-full bg-[#2a2e3f]">
+        <div className="h-full rounded-full" style={{ width: `${percent}%`, background: color }} />
       </div>
-      <span className="w-24 text-[9px] text-[#565f89]">{detail}</span>
+      <span className="whitespace-nowrap text-[9px] text-[#565f89]">{detail}</span>
     </div>
   )
 }
@@ -57,15 +57,20 @@ export function SystemResourceMonitor() {
   const memPct = res.memTotal > 0 ? Math.round((res.memUsed / res.memTotal) * 100) : 0
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2.5">
       <Bar label="CPU" percent={res.cpu} detail={`${res.cpu}%`} />
       <Bar label="RAM" percent={memPct} detail={`${gb(res.memUsed)}/${gb(res.memTotal)} GB`} />
       {res.gpu && (
-        <Bar
-          label="GPU"
-          percent={res.gpu.util}
-          detail={`${res.gpu.util}% ${(res.gpu.memUsed / 1024).toFixed(1)}/${(res.gpu.memTotal / 1024).toFixed(1)}G`}
-        />
+        <>
+          <Bar label="GPU" percent={res.gpu.util} detail={`${res.gpu.util}%`} />
+          <Bar
+            label="VRAM"
+            percent={
+              res.gpu.memTotal > 0 ? Math.round((res.gpu.memUsed / res.gpu.memTotal) * 100) : 0
+            }
+            detail={`${(res.gpu.memUsed / 1024).toFixed(1)}/${(res.gpu.memTotal / 1024).toFixed(1)} GB`}
+          />
+        </>
       )}
     </div>
   )

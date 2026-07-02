@@ -91,11 +91,15 @@ function Canvas() {
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<Menu | null>(null)
   const [showMinimap, setShowMinimap] = useState(true)
+  const [snapToGrid, setSnapToGrid] = useState(false)
 
-  // 設定（ミニマップ表示）を読み込み、保存時の pg-settings で更新
+  // 設定（ミニマップ表示 / グリッドスナップ）を読み込み、保存時の pg-settings で更新
   useEffect(() => {
     const load = (): void => {
-      window.api.getSettings().then((s) => setShowMinimap(s.showMinimap))
+      window.api.getSettings().then((s) => {
+        setShowMinimap(s.showMinimap)
+        setSnapToGrid(s.snapToGrid)
+      })
     }
     load()
     window.addEventListener('pg-settings', load)
@@ -169,6 +173,8 @@ function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        snapToGrid={snapToGrid}
+        snapGrid={[20, 20]}
         onSelectionChange={onSelectionChange}
         onNodesDelete={(deleted) => deleted.forEach((n) => removeNode(n.id))}
         onPaneContextMenu={onPaneContextMenu}
@@ -287,7 +293,7 @@ export default function App() {
           </aside>
         </div>
         {/* 下部ステータスバー（右端にシステムリソース） */}
-        <footer className="flex h-6 shrink-0 items-center justify-end border-t border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
+        <footer className="flex h-8 shrink-0 items-center justify-end border-t border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
           <SystemResourceMonitor />
         </footer>
       </div>

@@ -62,6 +62,15 @@ export function SettingsPanel() {
         ミニマップを表示
       </label>
 
+      <label className="flex items-center gap-2 text-[11px] text-[#c0caf5]">
+        <input
+          type="checkbox"
+          checked={settings.snapToGrid}
+          onChange={(e) => update({ snapToGrid: e.target.checked })}
+        />
+        ノードをグリッドにスナップ（移動・リサイズ）
+      </label>
+
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between text-[11px] text-[#c0caf5]">
           <span>コンテキスト長</span>

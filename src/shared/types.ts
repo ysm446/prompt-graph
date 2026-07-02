@@ -163,6 +163,7 @@ export interface AppSettings {
   visibilityPrompt: string // 可視性フィルタのシステムプロンプト（編集可）
   showResources: boolean // システムリソース表示のオンオフ
   showMinimap: boolean // ミニマップ表示のオンオフ
+  snapToGrid: boolean // ノードの移動・リサイズをグリッドにスナップ
 }
 
 export interface SystemResources {

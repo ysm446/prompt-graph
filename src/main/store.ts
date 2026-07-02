@@ -17,7 +17,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   contextSize: 4096,
   visibilityPrompt: DEFAULT_VISIBILITY_PROMPT,
   showResources: false,
-  showMinimap: true
+  showMinimap: true,
+  snapToGrid: false
 }
 
 export class Store {
