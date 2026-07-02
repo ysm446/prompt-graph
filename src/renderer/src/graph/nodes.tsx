@@ -28,7 +28,7 @@ import type {
   NodeKind,
   SceneData
 } from '@shared/types'
-import { getVisibilityInput, visibilityHash } from '@shared/compile'
+import { compileScene, getVisibilityInput, visibilityHash } from '@shared/compile'
 import {
   dryRun,
   expandRenderJobs,
@@ -530,6 +530,33 @@ function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
 export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
+  const [copied, setCopied] = useState(false)
+
+  // 上流ノードから合成した positive をリアルタイム表示（文字列なので変化時のみ再描画）
+  const compiled = useGraphStore((s) => {
+    const gNodes: GraphNode[] = s.nodes.map((n) => ({
+      id: n.id,
+      kind: n.type as NodeKind,
+      position: n.position,
+      data: n.data
+    }))
+    const gEdges: GraphEdge[] = s.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle ?? null,
+      targetHandle: e.targetHandle ?? null
+    }))
+    const scene = gNodes.find((n) => n.id === id)
+    return scene ? compileScene(scene, gNodes, gEdges).positivePretty : ''
+  })
+
+  const copy = async (): Promise<void> => {
+    await navigator.clipboard.writeText(compiled)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1200)
+  }
+
   return (
     <Shell
       id={id}
@@ -591,6 +618,21 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
       </label>
 
       <VisibilitySection id={id} d={d} />
+
+      {/* 合成プロンプト（上流から生成した positive をその場で確認） */}
+      <div className="-mx-4 mt-1 border-t border-[var(--border)] px-4 pt-2">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--text-faint)]">
+            合成プロンプト
+          </span>
+          <button className="nodrag text-[10px] text-[var(--accent)] hover:underline" onClick={copy}>
+            {copied ? 'copied!' : 'copy'}
+          </button>
+        </div>
+        <pre className="node-scrollbar max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-[8px] bg-[var(--bg-input)] p-2 text-[10px] leading-relaxed text-[#9ece6a]">
+          {compiled || '(空)'}
+        </pre>
+      </div>
     </Shell>
   )
 }
@@ -1105,10 +1147,7 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
                   setMenu({ x: e.clientX, y: e.clientY, path: im.path })
                 }}
               />
-              <span
-                className="truncate text-[9px] text-[var(--text-faint)]"
-                title={im.label}
-              >
+              <span className="nodrag cursor-text select-text break-all text-[9px] text-[var(--text-faint)]">
                 {im.label ? `${im.label} · ` : ''}
                 {im.seed != null ? `seed: ${im.seed}` : ''}
               </span>
