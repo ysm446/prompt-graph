@@ -15,6 +15,7 @@ import {
   Mountain,
   Palette,
   PersonStanding,
+  Recycle,
   Sparkles,
   User,
   X
@@ -29,6 +30,7 @@ import type {
 } from '@shared/types'
 import { compileScene, getVisibilityInput, visibilityHash } from '@shared/compile'
 import { dryRun, findSceneForBatch, findSceneForNode, type DryRunResult } from '@shared/batch'
+import { notifyStatus } from '../lib/status'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
 import { SCENE_INPUTS } from './factory'
@@ -292,10 +294,60 @@ export function CameraNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
+// Seed ノードの下流をたどり、Render ノードの実 seed(lastSeed)を集める。
+function downstreamRenderSeeds(seedId: string, nodes: GraphNode[], edges: GraphEdge[]): number[] {
+  const out = new Map<string, string[]>()
+  for (const e of edges) {
+    const list = out.get(e.source) ?? []
+    list.push(e.target)
+    out.set(e.source, list)
+  }
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const seen = new Set<string>()
+  const queue = [seedId]
+  const seeds: number[] = []
+  while (queue.length) {
+    const cur = queue.shift() as string
+    for (const t of out.get(cur) ?? []) {
+      if (seen.has(t)) continue
+      seen.add(t)
+      const n = byId.get(t)
+      if (n?.kind === 'render') {
+        const ls = (n.data as Extract<NodeData, { kind: 'render' }>).lastSeed
+        if (typeof ls === 'number') seeds.push(ls)
+      }
+      queue.push(t)
+    }
+  }
+  return seeds
+}
+
 export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'seed' }>
   const update = useUpdate(id)
   const mode = d.mode ?? 'fixed'
+
+  // 下流 Render の実 seed を取得して value へ反映
+  const pullSeed = (): void => {
+    const { nodes, edges } = storeGraph()
+    const seeds = downstreamRenderSeeds(id, nodes, edges)
+    if (seeds.length === 0) {
+      notifyStatus('下流の Render に seed がありません')
+      return
+    }
+    update({ value: mode === 'list' ? seeds.join(', ') : String(seeds[0]) })
+    notifyStatus(`seed を取得: ${seeds.join(', ')}`)
+  }
+
+  const recycleBtn = (
+    <button
+      className="nodrag flex shrink-0 items-center rounded-[8px] border border-[var(--border)] p-1.5 text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
+      onClick={pullSeed}
+      title="下流の Render の seed を取得"
+    >
+      <Recycle size={13} />
+    </button>
+  )
   const numInput = (value: number, on: (n: number) => void) => (
     <input
       type="number"
@@ -320,12 +372,22 @@ export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
       </Field>
       {mode === 'fixed' && (
         <Field label="seed (-1=ランダム)">
-          <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
+          <div className="flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
+            </div>
+            {recycleBtn}
+          </div>
         </Field>
       )}
       {mode === 'list' && (
         <Field label="seed リスト">
-          <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="1, 2, 3" />
+          <div className="flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="1, 2, 3" />
+            </div>
+            {recycleBtn}
+          </div>
         </Field>
       )}
       {mode === 'increment' && (

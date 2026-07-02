@@ -19,6 +19,7 @@ import type {
   WorkspaceMeta
 } from '@shared/types'
 import { createNode, scenePinForKind, DEFAULT_NODE_WIDTH } from '../graph/factory'
+import { notifyStatus } from '../lib/status'
 
 export type RFNode = Node<NodeData, NodeKind>
 
@@ -191,6 +192,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     }
     pasteCount = 0
     set({ hasClipboard: true })
+    notifyStatus(`${clipboard.nodes.length} 個のノードをコピー`)
   },
 
   pasteNodes: (at) =>
@@ -199,14 +201,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const idMap = new Map<string, string>()
       clipboard.nodes.forEach((n) => idMap.set(n.id, nanoid(8)))
 
-      // 配置オフセット: at 指定ならグループ左上をそこへ、無ければ少しずらして重ねる
+      // 配置オフセット: at 指定ならグループ中央をそこへ、無ければ少しずらして重ねる
       let dx = 0
       let dy = 0
       if (at) {
-        const minX = Math.min(...clipboard.nodes.map((n) => n.position.x))
-        const minY = Math.min(...clipboard.nodes.map((n) => n.position.y))
-        dx = at.x - minX
-        dy = at.y - minY
+        const xs = clipboard.nodes.map((n) => n.position.x)
+        const ys = clipboard.nodes.map((n) => n.position.y)
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2
+        const cy = (Math.min(...ys) + Math.max(...ys)) / 2
+        dx = at.x - cx
+        dy = at.y - cy
       } else {
         pasteCount += 1
         dx = dy = 30 * pasteCount
@@ -234,6 +238,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           selected: true
         }))
 
+      notifyStatus(`${newNodes.length} 個のノードを貼り付け`)
       return {
         nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
         edges: [...s.edges, ...newEdges],
@@ -295,6 +300,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     await window.api.saveWorkspace(filled)
     set(applySnapshot(filled)) // 複製先へ切り替え
     await get().refreshWorkspaces()
+    notifyStatus(`複製しました: ${filled.name}`)
   },
 
   saveActive: async () => {
@@ -303,6 +309,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     await window.api.saveWorkspace(snap)
     set({ dirty: false })
     await get().refreshWorkspaces()
+    notifyStatus('保存しました')
   },
 
   renameWorkspace: async (id, name) => {
@@ -317,6 +324,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   deleteWorkspace: async (id) => {
     await window.api.deleteWorkspace(id)
+    notifyStatus('削除しました')
     const remaining = await window.api.listWorkspaces()
     set({ workspaces: remaining })
     if (id === get().activeId) {

@@ -20,6 +20,7 @@ import { CompilePanel } from './components/CompilePanel'
 import { ModelBar } from './components/ModelBar'
 import { WorkspacePanel } from './components/WorkspacePanel'
 import { SystemResourceMonitor } from './components/SystemResourceMonitor'
+import { StatusMessage } from './components/StatusMessage'
 
 const ADD_ORDER: NodeKind[] = [
   'character',
@@ -178,12 +179,19 @@ function Canvas() {
         if (ids.length) useGraphStore.getState().copyNodes(ids)
       } else if (mod && e.key.toLowerCase() === 'v') {
         e.preventDefault()
-        useGraphStore.getState().pasteNodes()
+        // カメラ（表示領域）中央へ貼り付ける
+        const pane = document.querySelector('.react-flow') as HTMLElement | null
+        let at: { x: number; y: number } | undefined
+        if (pane) {
+          const r = pane.getBoundingClientRect()
+          at = screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
+        }
+        useGraphStore.getState().pasteNodes(at)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [screenToFlowPosition])
 
   return (
     <>
@@ -338,8 +346,11 @@ export default function App() {
             <CompilePanel />
           </aside>
         </div>
-        {/* 下部ステータスバー（右端にシステムリソース） */}
-        <footer className="flex h-8 shrink-0 items-center justify-end border-t border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
+        {/* 下部ステータスバー（左: アクション表示 / 右: システムリソース） */}
+        <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
+          <div className="min-w-0 flex-1">
+            <StatusMessage />
+          </div>
           <SystemResourceMonitor />
         </footer>
       </div>
