@@ -873,11 +873,18 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
   const [img, setImg] = useState<string | null>(null) // data URL（非永続）
   const [seed, setSeed] = useState<number | null>(d.lastSeed ?? null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [zoom, setZoom] = useState(false) // 画像の拡大表示
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null) // 生成の経過時間（生成後も保持）
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const startRef = useRef(0)
 
   useEffect(() => {
     window.api.getForgeStatus().then(setForge)
     return window.api.onForgeStatus(setForge)
   }, [])
+
+  // アンマウント時にタイマー停止
+  useEffect(() => () => clearInterval(timerRef.current), [])
 
   // 保存済み画像パスから再表示（起動直後・ワークスペース切替時）
   useEffect(() => {
@@ -910,6 +917,16 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
     return () => window.removeEventListener('mousedown', close)
   }, [menu])
 
+  // 拡大表示は Escape で閉じる
+  useEffect(() => {
+    if (!zoom) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setZoom(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [zoom])
+
   async function generate() {
     setErr(null)
     const { nodes, edges } = storeGraph()
@@ -924,6 +941,7 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       return
     }
     setBusy(true)
+    startRef.current = 0
     try {
       // 未起動なら起動して稼働まで待つ（初回は venv/torch 構築で長い）
       if (forge.state !== 'running') {
@@ -932,6 +950,12 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
         await waitForForgeRunning()
         setNote(null)
       }
+      // ここから生成時間を計測（起動待ちは含めない）
+      startRef.current = performance.now()
+      setElapsedMs(0)
+      clearInterval(timerRef.current)
+      timerRef.current = setInterval(() => setElapsedMs(performance.now() - startRef.current), 100)
+
       const s = compiled.seed && Number.isFinite(Number(compiled.seed)) ? Number(compiled.seed) : -1
       const res = await window.api.forgeTxt2img({
         prompt: compiled.positive,
@@ -950,6 +974,8 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
     } catch (e) {
       setErr((e as Error).message)
     } finally {
+      clearInterval(timerRef.current)
+      if (startRef.current > 0) setElapsedMs(performance.now() - startRef.current) // 最終値を確定
       setBusy(false)
       setNote(null)
     }
@@ -1017,12 +1043,22 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       )}
       {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
 
+      {elapsedMs != null && (
+        <span className="text-[10px] text-[var(--text-faint)]">
+          {busy ? '経過' : '生成時間'}:{' '}
+          {elapsedMs < 60000
+            ? `${(elapsedMs / 1000).toFixed(1)}s`
+            : `${Math.floor(elapsedMs / 60000)}:${String(Math.floor((elapsedMs % 60000) / 1000)).padStart(2, '0')}`}
+        </span>
+      )}
+
       {img && (
         <div className="flex flex-col gap-1">
           <img
             src={img}
             alt="生成結果"
-            className="w-full rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
+            className="nodrag w-full cursor-zoom-in rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
+            onClick={() => setZoom(true)}
             onContextMenu={(e) => {
               if (!d.lastImagePath) return
               e.preventDefault()
@@ -1050,6 +1086,23 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
             >
               画像の保存場所を開く
             </button>
+          </div>,
+          document.body
+        )}
+
+      {zoom &&
+        img &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-8 backdrop-blur-md"
+            onClick={() => setZoom(false)}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            <img
+              src={img}
+              alt="生成結果（拡大）"
+              className="max-h-full max-w-full cursor-zoom-out rounded-[10px] object-contain shadow-2xl"
+            />
           </div>,
           document.body
         )}
