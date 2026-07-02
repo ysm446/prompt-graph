@@ -23,19 +23,28 @@ function buildIncomers(edges: GraphEdge[]): Map<string, string[]> {
   return m
 }
 
+/** 指定ノードの直接上流から Scene を1つ探す（Batch / Render 共通）。 */
+export function findSceneForNode(
+  nodeId: string,
+  nodes: GraphNode[],
+  edges: GraphEdge[]
+): GraphNode | null {
+  const incomers = buildIncomers(edges)
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  for (const src of incomers.get(nodeId) ?? []) {
+    const n = byId.get(src)
+    if (n?.kind === 'scene') return n
+  }
+  return null
+}
+
 /** Batch ノードの上流から Scene を1つ探す。 */
 export function findSceneForBatch(
   batchId: string,
   nodes: GraphNode[],
   edges: GraphEdge[]
 ): GraphNode | null {
-  const incomers = buildIncomers(edges)
-  const byId = new Map(nodes.map((n) => [n.id, n]))
-  for (const src of incomers.get(batchId) ?? []) {
-    const n = byId.get(src)
-    if (n?.kind === 'scene') return n
-  }
-  return null
+  return findSceneForNode(batchId, nodes, edges)
 }
 
 /** Scene の上流をたどり、多値ノード（camera プリセット>1, seed 値>1）を軸として集める。 */

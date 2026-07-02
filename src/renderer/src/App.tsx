@@ -33,7 +33,8 @@ const ADD_ORDER: NodeKind[] = [
   'seed',
   'reference',
   'scene',
-  'batch'
+  'batch',
+  'render'
 ]
 
 type Menu =
@@ -141,8 +142,8 @@ function Canvas() {
       if (target.type === 'soloAction' && c.targetHandle === 'charIn') {
         return source.type === 'character'
       }
-      // Batch の入力は Scene のみ
-      if (target.type === 'batch') {
+      // Batch / Render の入力は Scene のみ
+      if (target.type === 'batch' || target.type === 'render') {
         return source.type === 'scene'
       }
       return true

@@ -4,7 +4,10 @@ import type {
   AppSettings,
   ForgeInstall,
   ForgeInstallProgress,
+  ForgeSdModel,
   ForgeServerStatus,
+  ForgeTxt2ImgParams,
+  ForgeTxt2ImgResult,
   LlamaInstall,
   LlamaInstallProgress,
   LlamaModel,
@@ -55,6 +58,9 @@ export interface PromptGraphApi {
   startForge(): Promise<ForgeServerStatus>
   stopForge(): Promise<void>
   getForgeStatus(): Promise<ForgeServerStatus>
+  forgeSdModels(): Promise<ForgeSdModel[]>
+  forgeSamplers(): Promise<string[]>
+  forgeTxt2img(params: ForgeTxt2ImgParams): Promise<ForgeTxt2ImgResult>
 
   openImageDialog(): Promise<string | null>
   imageMetadata(path: string): Promise<ImageMetadata>

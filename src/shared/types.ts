@@ -17,6 +17,7 @@ export type NodeKind =
   | 'reference'
   | 'scene'
   | 'batch'
+  | 'render'
 
 // 注意: 以下のノード data 型は React Flow の Node<T extends Record<string, unknown>>
 // の制約を満たすため `type`（クローズドな型）で定義する。interface は宣言マージ可能
@@ -95,6 +96,18 @@ export type BatchData = {
   sampleCount: number
 }
 
+// Render: 接続した Scene のプロンプトを Forge (txt2img) で生成する。
+// 生成画像は永続化しない（ワークスペース JSON が肥大化するため）。
+export type RenderData = {
+  label: string
+  model: string | null // checkpoint title。null なら現在ロード中のモデル
+  sampler: string
+  steps: number
+  cfg: number
+  width: number
+  height: number
+}
+
 export type SceneData = {
   label: string
   peopleTagAuto: boolean // 人数タグ（2girls 等）を自動付与するか
@@ -123,6 +136,7 @@ export type NodeData =
   | ({ kind: 'reference' } & ReferenceData)
   | ({ kind: 'scene' } & SceneData)
   | ({ kind: 'batch' } & BatchData)
+  | ({ kind: 'render' } & RenderData)
 
 export interface GraphNode {
   id: string
@@ -267,4 +281,26 @@ export interface ForgeServerStatus {
   state: ForgeServerState
   url: string | null
   message: string | null
+}
+
+// txt2img（/sdapi/v1/txt2img）。本アプリは negative を使わない仕様。
+export interface ForgeSdModel {
+  title: string // override_settings.sd_model_checkpoint に渡す値
+  modelName: string
+}
+
+export interface ForgeTxt2ImgParams {
+  prompt: string
+  steps: number
+  cfgScale: number
+  sampler: string
+  width: number
+  height: number
+  seed: number // -1 でランダム
+  model: string | null // checkpoint title。null なら現在ロード中のモデル
+}
+
+export interface ForgeTxt2ImgResult {
+  imageDataUrl: string // data:image/png;base64,...
+  seed: number | null
 }

@@ -1,7 +1,7 @@
 // WebUI Forge プロセスの起動・停止・ヘルスチェック。
 // image-assistant の sd_process.py を TS へ移植（webui.bat を起動し HTTP readiness を待つ）。
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
-import { createWriteStream, existsSync, writeFileSync, type WriteStream } from 'node:fs'
+import { closeSync, existsSync, openSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ForgeServerStatus } from '../shared/types'
 
@@ -40,6 +40,38 @@ export async function resolvePython310(): Promise<string | null> {
   return null
 }
 
+// 前セッションの取りこぼし（dev の強制終了等）で残った、この forgeDir 配下の
+// Forge プロセスを掃除する。他アプリ（別パス）の Forge は対象外。
+// これをしないと start() が孤児に isHttpReady でアタッチし、古い stdio のまま
+// txt2img が OSError(Errno 22) になる。
+async function killStaleForge(forgeDir: string): Promise<void> {
+  const ps =
+    `Get-CimInstance Win32_Process | ` +
+    `Where-Object { $_.CommandLine -like '*${forgeDir.replace(/'/g, "''")}*' } | ` +
+    `ForEach-Object { taskkill /PID $_.ProcessId /T /F 2>$null }`
+  await new Promise<void>((resolve) => {
+    try {
+      const cp = spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+        windowsHide: true
+      })
+      const timer = setTimeout(() => {
+        cp.kill()
+        resolve()
+      }, 8000)
+      cp.on('error', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+      cp.on('exit', () => {
+        clearTimeout(timer)
+        resolve()
+      })
+    } catch {
+      resolve()
+    }
+  })
+}
+
 // 初回起動は venv 構築・torch DL が走るため非常に長い（分単位）。
 const READY_TIMEOUT_MS = 20 * 60 * 1000
 const POLL_INTERVAL_MS = 2000
@@ -64,7 +96,7 @@ export interface ForgeStartOptions {
 
 export class ForgeServerManager {
   private child: ChildProcess | null = null
-  private logFh: WriteStream | null = null
+  private logFd: number | null = null
   private readyAbort: AbortController | null = null
   private status: ForgeServerStatus = { state: 'stopped', url: null, message: null }
   private onChange?: (status: ForgeServerStatus) => void
@@ -92,8 +124,11 @@ export class ForgeServerManager {
       throw new Error(`webui.bat が見つかりません: ${opts.forgeDir}`)
     }
 
+    // 前セッションの孤児 Forge を掃除してから起動（古い stdio へのアタッチを防ぐ）。
+    await killStaleForge(opts.forgeDir)
+
     const url = `http://${opts.host}:${opts.port}`
-    // 既に外部/前回のプロセスが応答するなら running 扱い。
+    // 掃除後もまだ応答するなら、別アプリ管理の外部 Forge とみなして再利用する。
     if (await isHttpReady(url)) {
       this.update({ state: 'running', url, message: null })
       return this.status
@@ -125,6 +160,7 @@ export class ForgeServerManager {
     env.TORCH_INDEX_URL ??= 'https://download.pytorch.org/whl/cu128'
     env.TORCH_COMMAND ??=
       'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128'
+    env.PYTHONUNBUFFERED = '1' // ログを即時フラッシュ
 
     // setuptools 81 で pkg_resources が削除され、CLIP 等の古い setup.py が
     // ビルドできなくなるため、ビルド時 setuptools を 81 未満に固定する。
@@ -149,18 +185,17 @@ export class ForgeServerManager {
       '--api' // REST(/sdapi) の有無を Phase C で実測できるよう有効化
     ]
 
-    this.logFh = createWriteStream(opts.logPath, { flags: 'w' })
+    // 子の stdout/stderr は「実ファイルの fd」に直接向ける（パイプにしない）。
+    // パイプ経由だと Windows で Forge の進捗出力が OSError(Errno 22) を誘発するため。
+    // stdin は 'ignore'（EOF）にして webui.bat の `pause` が即抜けるようにする。
+    this.logFd = openSync(opts.logPath, 'w')
     const child = spawn('cmd.exe', args, {
       cwd: opts.forgeDir,
       windowsHide: true,
-      env
+      env,
+      stdio: ['ignore', this.logFd, this.logFd]
     })
     this.child = child
-    // stdin を閉じておくと webui.bat の `pause`（エラー時のキー入力待ち）が
-    // 即 EOF で抜け、プロセスが終了 → エラー状態を検知できる（無限「起動中」を防ぐ）。
-    child.stdin?.end()
-    child.stdout?.on('data', (d) => this.logFh?.write(d))
-    child.stderr?.on('data', (d) => this.logFh?.write(d))
     child.on('exit', (code) => {
       this.child = null
       this.closeLog()
@@ -199,8 +234,14 @@ export class ForgeServerManager {
   }
 
   private closeLog(): void {
-    this.logFh?.end()
-    this.logFh = null
+    if (this.logFd !== null) {
+      try {
+        closeSync(this.logFd)
+      } catch {
+        /* 既に閉じている場合など */
+      }
+      this.logFd = null
+    }
   }
 
   async stop(): Promise<void> {

@@ -6,7 +6,10 @@ import type {
   AppSettings,
   ForgeInstall,
   ForgeInstallProgress,
+  ForgeSdModel,
   ForgeServerStatus,
+  ForgeTxt2ImgParams,
+  ForgeTxt2ImgResult,
   LlamaInstall,
   LlamaInstallProgress,
   LlamaModel,
@@ -58,6 +61,10 @@ const api: PromptGraphApi = {
   startForge: (): Promise<ForgeServerStatus> => ipcRenderer.invoke(IPC.forgeStart),
   stopForge: (): Promise<void> => ipcRenderer.invoke(IPC.forgeStop),
   getForgeStatus: (): Promise<ForgeServerStatus> => ipcRenderer.invoke(IPC.forgeStatus),
+  forgeSdModels: (): Promise<ForgeSdModel[]> => ipcRenderer.invoke(IPC.forgeSdModels),
+  forgeSamplers: (): Promise<string[]> => ipcRenderer.invoke(IPC.forgeSamplers),
+  forgeTxt2img: (params: ForgeTxt2ImgParams): Promise<ForgeTxt2ImgResult> =>
+    ipcRenderer.invoke(IPC.forgeTxt2img, params),
 
   openImageDialog: (): Promise<string | null> => ipcRenderer.invoke(IPC.dialogOpenImage),
   imageMetadata: (path: string): Promise<ImageMetadata> =>

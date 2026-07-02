@@ -4,6 +4,7 @@ import { IPC, type AppPaths } from '../shared/ipc'
 import type {
   AppSettings,
   ForgeInstallProgress,
+  ForgeTxt2ImgParams,
   LlamaInstallProgress,
   LlamaReleaseVariant,
   ProjectSnapshot
@@ -11,6 +12,7 @@ import type {
 import { fetchLlamaReleases, installLlamaVariant } from './llamaInstaller'
 import { cloneForge, isForgeCloned } from './forgeInstaller'
 import { ForgeServerManager } from './forgeServer'
+import { listSamplers, listSdModels, txt2img } from './forgeClient'
 import { runDecompose, runVisibilityFilter } from './llamaClient'
 import { LlamaServerManager, listModels } from './llamaServer'
 import { readImageDataUrl, readImageMetadata } from './pngMeta'
@@ -35,8 +37,9 @@ let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: 1920,
+    height: 1080,
+    useContentSize: true, // width/height を（フレーム込みでなく）コンテンツ領域基準にする
     backgroundColor: '#0f1115',
     autoHideMenuBar: true,
     webPreferences: {
@@ -205,6 +208,20 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.forgeStop, () => forge.stop())
   ipcMain.handle(IPC.forgeStatus, () => forge.getStatus())
+
+  const forgeBaseUrl = (): string => {
+    const status = forge.getStatus()
+    if (status.state !== 'running' || !status.url) {
+      throw new Error('WebUI Forge が稼働していません')
+    }
+    return status.url
+  }
+
+  ipcMain.handle(IPC.forgeSdModels, () => listSdModels(forgeBaseUrl()))
+  ipcMain.handle(IPC.forgeSamplers, () => listSamplers(forgeBaseUrl()))
+  ipcMain.handle(IPC.forgeTxt2img, (_e, params: ForgeTxt2ImgParams) =>
+    txt2img(forgeBaseUrl(), params)
+  )
 
   ipcMain.handle(IPC.dialogOpenImage, async () => {
     const opts = {

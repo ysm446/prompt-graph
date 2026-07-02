@@ -7,7 +7,9 @@ import {
   Dices,
   Handshake,
   Image as ImageIcon,
+  ImagePlus,
   Lightbulb,
+  Loader2,
   type LucideIcon,
   Mountain,
   Palette,
@@ -16,9 +18,16 @@ import {
   User,
   X
 } from 'lucide-react'
-import type { GraphEdge, GraphNode, NodeData, NodeKind, SceneData } from '@shared/types'
-import { getVisibilityInput, visibilityHash } from '@shared/compile'
-import { dryRun, findSceneForBatch, type DryRunResult } from '@shared/batch'
+import type {
+  ForgeServerStatus,
+  GraphEdge,
+  GraphNode,
+  NodeData,
+  NodeKind,
+  SceneData
+} from '@shared/types'
+import { compileScene, getVisibilityInput, visibilityHash } from '@shared/compile'
+import { dryRun, findSceneForBatch, findSceneForNode, type DryRunResult } from '@shared/batch'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
 import { SCENE_INPUTS } from './factory'
@@ -35,7 +44,8 @@ export const ACCENT: Record<NodeKind, string> = {
   seed: '#a9b1d6',
   reference: '#7dcfff',
   scene: '#ff9e64',
-  batch: '#f7768e'
+  batch: '#f7768e',
+  render: '#bb9af7'
 }
 
 const NODE_ICONS: Record<NodeKind, LucideIcon> = {
@@ -50,7 +60,8 @@ const NODE_ICONS: Record<NodeKind, LucideIcon> = {
   seed: Dices,
   reference: ImageIcon,
   scene: Clapperboard,
-  batch: Boxes
+  batch: Boxes,
+  render: ImagePlus
 }
 
 function useUpdate(id: string) {
@@ -742,6 +753,164 @@ export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
+// Render: 接続した Scene を Forge (txt2img) で生成する。生成画像は永続化しない。
+function NumField({
+  label,
+  value,
+  step,
+  min,
+  onChange
+}: {
+  label: string
+  value: number
+  step?: number
+  min?: number
+  onChange: (n: number) => void
+}) {
+  return (
+    <Field label={label}>
+      <input
+        type="number"
+        className={inputCls}
+        value={value}
+        step={step}
+        min={min}
+        onChange={(e) => onChange(Number(e.target.value) || (min ?? 0))}
+      />
+    </Field>
+  )
+}
+
+export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
+  const d = data as Extract<NodeData, { kind: 'render' }>
+  const update = useUpdate(id)
+  const [forge, setForge] = useState<ForgeServerStatus>({ state: 'stopped', url: null, message: null })
+  const [models, setModels] = useState<{ title: string; modelName: string }[]>([])
+  const [samplers, setSamplers] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [img, setImg] = useState<string | null>(null) // data URL（非永続）
+  const [seed, setSeed] = useState<number | null>(null)
+
+  useEffect(() => {
+    window.api.getForgeStatus().then(setForge)
+    return window.api.onForgeStatus(setForge)
+  }, [])
+
+  const running = forge.state === 'running'
+  useEffect(() => {
+    if (!running) return
+    window.api.forgeSdModels().then(setModels).catch(() => setModels([]))
+    window.api.forgeSamplers().then(setSamplers).catch(() => setSamplers([]))
+  }, [running])
+
+  async function generate() {
+    setErr(null)
+    const { nodes, edges } = storeGraph()
+    const scene = findSceneForNode(id, nodes, edges)
+    if (!scene) {
+      setErr('Scene を接続してください')
+      return
+    }
+    const compiled = compileScene(scene, nodes, edges)
+    if (!compiled.positive.trim()) {
+      setErr('プロンプトが空です')
+      return
+    }
+    setBusy(true)
+    try {
+      const s = compiled.seed && Number.isFinite(Number(compiled.seed)) ? Number(compiled.seed) : -1
+      const res = await window.api.forgeTxt2img({
+        prompt: compiled.positive,
+        steps: d.steps,
+        cfgScale: d.cfg,
+        sampler: d.sampler,
+        width: d.width,
+        height: d.height,
+        seed: s,
+        model: d.model
+      })
+      setImg(res.imageDataUrl)
+      setSeed(res.seed)
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Shell
+      id={id}
+      kind="render"
+      title={d.label}
+      selected={selected}
+      hasOutput={false}
+      inputs={[{ id: 'scene', label: 'Scene', top: 36 }]}
+    >
+      <p className="text-[10px] text-[var(--text-faint)]">← Scene を接続</p>
+
+      <Field label="モデル">
+        <select
+          className={inputCls}
+          value={d.model ?? ''}
+          onChange={(e) => update({ model: e.target.value || null })}
+        >
+          <option value="">（現在ロード中のモデル）</option>
+          {models.map((m) => (
+            <option key={m.title} value={m.title}>
+              {m.modelName}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="サンプラ">
+        <select
+          className={inputCls}
+          value={d.sampler}
+          onChange={(e) => update({ sampler: e.target.value })}
+        >
+          {(samplers.length ? samplers : [d.sampler]).map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="flex gap-2">
+        <NumField label="幅" value={d.width} step={64} min={64} onChange={(n) => update({ width: n })} />
+        <NumField label="高さ" value={d.height} step={64} min={64} onChange={(n) => update({ height: n })} />
+      </div>
+      <div className="flex gap-2">
+        <NumField label="steps" value={d.steps} step={1} min={1} onChange={(n) => update({ steps: n })} />
+        <NumField label="CFG" value={d.cfg} step={0.5} min={1} onChange={(n) => update({ cfg: n })} />
+      </div>
+
+      <button
+        className="nodrag flex items-center justify-center gap-1.5 rounded-[10px] bg-[rgba(68,54,124,0.96)] py-1.5 text-xs font-medium text-white hover:bg-[rgba(82,66,146,0.98)] disabled:opacity-40"
+        onClick={generate}
+        disabled={busy || !running}
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
+        {busy ? '生成中…' : '画像生成'}
+      </button>
+      {!running && <span className="text-[10px] text-[#e0af68]">Forge を起動してください</span>}
+      {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
+
+      {img && (
+        <div className="flex flex-col gap-1">
+          <img
+            src={img}
+            alt="生成結果"
+            className="w-full rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
+          />
+          {seed != null && <span className="text-[10px] text-[var(--text-faint)]">seed: {seed}</span>}
+        </div>
+      )}
+    </Shell>
+  )
+}
+
 export const nodeTypes = {
   character: CharacterNode,
   soloAction: SoloActionNode,
@@ -754,5 +923,6 @@ export const nodeTypes = {
   seed: SeedNode,
   reference: ReferenceNode,
   scene: SceneNode,
-  batch: BatchNode
+  batch: BatchNode,
+  render: RenderNode
 }

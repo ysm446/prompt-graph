@@ -13,7 +13,8 @@ export const NODE_LABELS: Record<NodeKind, string> = {
   seed: 'Seed',
   reference: 'Reference',
   scene: 'Scene',
-  batch: 'Batch'
+  batch: 'Batch',
+  render: 'Render'
 }
 
 // Scene のカテゴリ別入力ピン。id はエッジの targetHandle に対応。
@@ -53,7 +54,8 @@ export const DEFAULT_NODE_WIDTH: Record<NodeKind, number> = {
   seed: 240,
   reference: 340,
   scene: 270,
-  batch: 320
+  batch: 320,
+  render: 300
 }
 
 export function defaultData(kind: NodeKind): NodeData {
@@ -113,6 +115,17 @@ export function defaultData(kind: NodeKind): NodeData {
       }
     case 'batch':
       return { kind, label: 'Batch', mode: 'all', randomCount: 8, sampleCount: 5 }
+    case 'render':
+      return {
+        kind,
+        label: 'Render',
+        model: null,
+        sampler: 'Euler a',
+        steps: 30,
+        cfg: 7,
+        width: 1280,
+        height: 960
+      }
     case 'scene':
       return {
         kind,
