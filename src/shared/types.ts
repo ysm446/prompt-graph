@@ -106,8 +106,9 @@ export type RenderData = {
   cfg: number
   width: number
   height: number
-  lastImagePath: string // 直近生成画像の保存先（次回起動時の再表示用。画像本体は保存しない）
-  lastSeed: number | null // 直近生成の実 seed
+  // 直近生成画像（次回起動時の再表示用。画像本体は保存せずパスのみ）。
+  // 上流の多値（Seed リスト等）を直積展開して複数枚生成できる。
+  lastImages: Array<{ path: string; seed: number | null; label: string }>
 }
 
 export type SceneData = {

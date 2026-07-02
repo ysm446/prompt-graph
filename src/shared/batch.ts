@@ -138,6 +138,34 @@ function enumerateRandom(axes: Axis[], count: number): number[][] {
   return picks
 }
 
+export interface RenderJob {
+  label: string // 軸の組み合わせラベル（空なら軸なし）
+  positive: string
+  seed: number // -1 = ランダム
+}
+
+/**
+ * Scene 上流の多値（Camera プリセット / Seed 複数値 等）を直積で展開し、
+ * 各組み合わせのプロンプトと seed を返す。軸が無ければ 1 件。limit で打ち切り。
+ */
+export function expandRenderJobs(
+  scene: GraphNode,
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  limit = 100
+): RenderJob[] {
+  const axes = collectAxes(scene, nodes, edges)
+  const picks = axes.length === 0 ? [[]] : enumerateAll(axes, limit)
+  return picks.map((p) => {
+    const ov = toOverrides(axes, p)
+    const compiled = compileScene(scene, nodes, edges, ov)
+    const label = axes.map((a, i) => `${a.label}=${a.values[p[i]]}`).join(' / ')
+    const seed =
+      compiled.seed && Number.isFinite(Number(compiled.seed)) ? Number(compiled.seed) : -1
+    return { label, positive: compiled.positive, seed }
+  })
+}
+
 export interface DryRunResult {
   total: number // 直積総数（mode に関わらず全列挙したときの数）
   planned: number // 実際に展開する数（mode 反映後）

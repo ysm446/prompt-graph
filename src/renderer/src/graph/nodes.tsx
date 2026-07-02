@@ -28,8 +28,14 @@ import type {
   NodeKind,
   SceneData
 } from '@shared/types'
-import { compileScene, getVisibilityInput, visibilityHash } from '@shared/compile'
-import { dryRun, findSceneForBatch, findSceneForNode, type DryRunResult } from '@shared/batch'
+import { getVisibilityInput, visibilityHash } from '@shared/compile'
+import {
+  dryRun,
+  expandRenderJobs,
+  findSceneForBatch,
+  findSceneForNode,
+  type DryRunResult
+} from '@shared/batch'
 import { notifyStatus } from '../lib/status'
 import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
@@ -313,8 +319,9 @@ function downstreamRenderSeeds(seedId: string, nodes: GraphNode[], edges: GraphE
       seen.add(t)
       const n = byId.get(t)
       if (n?.kind === 'render') {
-        const ls = (n.data as Extract<NodeData, { kind: 'render' }>).lastSeed
-        if (typeof ls === 'number') seeds.push(ls)
+        for (const im of (n.data as Extract<NodeData, { kind: 'render' }>).lastImages ?? []) {
+          if (typeof im.seed === 'number') seeds.push(im.seed)
+        }
       }
       queue.push(t)
     }
@@ -870,13 +877,25 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null) // 起動中などの一時メッセージ
   const [err, setErr] = useState<string | null>(null)
-  const [img, setImg] = useState<string | null>(null) // data URL（非永続）
-  const [seed, setSeed] = useState<number | null>(d.lastSeed ?? null)
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [zoom, setZoom] = useState(false) // 画像の拡大表示
+  // 表示用の生成画像（data URL は非永続）。上流の多値を直積展開して複数枚生成できる。
+  const [images, setImages] = useState<
+    { url: string; seed: number | null; label: string; path: string }[]
+  >([])
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null)
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null) // 拡大表示中の画像
   const [elapsedMs, setElapsedMs] = useState<number | null>(null) // 生成の経過時間（生成後も保持）
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const startRef = useRef(0)
+
+  // 保存済み（+旧単一形式）を再表示用リストへ正規化
+  const legacy = d as unknown as { lastImagePath?: string; lastSeed?: number | null }
+  const persisted =
+    d.lastImages && d.lastImages.length > 0
+      ? d.lastImages
+      : legacy.lastImagePath
+        ? [{ path: legacy.lastImagePath, seed: legacy.lastSeed ?? null, label: '' }]
+        : []
+  const persistedKey = persisted.map((p) => p.path).join('|')
 
   useEffect(() => {
     window.api.getForgeStatus().then(setForge)
@@ -888,19 +907,27 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
 
   // 保存済み画像パスから再表示（起動直後・ワークスペース切替時）
   useEffect(() => {
-    if (!d.lastImagePath) {
-      setImg(null)
+    if (persisted.length === 0) {
+      setImages([])
       return
     }
     let alive = true
-    window.api
-      .imageDataUrl(d.lastImagePath)
-      .then((u) => alive && setImg(u))
-      .catch(() => alive && setImg(null))
+    Promise.all(
+      persisted.map((it) =>
+        window.api
+          .imageDataUrl(it.path)
+          .then((url) => ({ url, seed: it.seed, label: it.label, path: it.path }))
+          .catch(() => null)
+      )
+    ).then((res) => {
+      if (alive) setImages(res.filter((r): r is NonNullable<typeof r> => r !== null))
+    })
     return () => {
       alive = false
     }
-  }, [d.lastImagePath])
+    // persistedKey で内容変化のみ再取得
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistedKey])
 
   const running = forge.state === 'running'
   useEffect(() => {
@@ -919,13 +946,13 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
 
   // 拡大表示は Escape で閉じる
   useEffect(() => {
-    if (!zoom) return
+    if (!zoomUrl) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setZoom(false)
+      if (e.key === 'Escape') setZoomUrl(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [zoom])
+  }, [zoomUrl])
 
   async function generate() {
     setErr(null)
@@ -935,13 +962,16 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       setErr('Scene を接続してください')
       return
     }
-    const compiled = compileScene(scene, nodes, edges)
-    if (!compiled.positive.trim()) {
+    // 上流の多値（Seed リスト / Camera 複数プリセット等）を直積展開
+    const jobs = expandRenderJobs(scene, nodes, edges, 100)
+    if (jobs.length === 0 || !jobs[0].positive.trim()) {
       setErr('プロンプトが空です')
       return
     }
     setBusy(true)
     startRef.current = 0
+    setImages([])
+    const collected: { path: string; seed: number | null; label: string }[] = []
     try {
       // 未起動なら起動して稼働まで待つ（初回は venv/torch 構築で長い）
       if (forge.state !== 'running') {
@@ -956,23 +986,31 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       clearInterval(timerRef.current)
       timerRef.current = setInterval(() => setElapsedMs(performance.now() - startRef.current), 100)
 
-      const s = compiled.seed && Number.isFinite(Number(compiled.seed)) ? Number(compiled.seed) : -1
-      const res = await window.api.forgeTxt2img({
-        prompt: compiled.positive,
-        steps: d.steps,
-        cfgScale: d.cfg,
-        sampler: d.sampler,
-        width: d.width,
-        height: d.height,
-        seed: s,
-        model: d.model
-      })
-      setImg(res.imageDataUrl)
-      setSeed(res.seed)
-      // 次回起動時の再表示用にパスと seed をノードへ保存
-      update({ lastImagePath: res.savedPath, lastSeed: res.seed })
+      for (let i = 0; i < jobs.length; i++) {
+        const job = jobs[i]
+        if (jobs.length > 1) setNote(`生成中 (${i + 1}/${jobs.length})`)
+        const res = await window.api.forgeTxt2img({
+          prompt: job.positive,
+          steps: d.steps,
+          cfgScale: d.cfg,
+          sampler: d.sampler,
+          width: d.width,
+          height: d.height,
+          seed: job.seed,
+          model: d.model
+        })
+        collected.push({ path: res.savedPath, seed: res.seed, label: job.label })
+        setImages((prev) => [
+          ...prev,
+          { url: res.imageDataUrl, seed: res.seed, label: job.label, path: res.savedPath }
+        ])
+      }
+      // 次回起動時の再表示用にパス/seed/ラベルをノードへ保存
+      update({ lastImages: collected })
+      notifyStatus(`${collected.length} 枚生成しました`)
     } catch (e) {
       setErr((e as Error).message)
+      if (collected.length > 0) update({ lastImages: collected }) // 途中まででも保存
     } finally {
       clearInterval(timerRef.current)
       if (startRef.current > 0) setElapsedMs(performance.now() - startRef.current) // 最終値を確定
@@ -1052,21 +1090,30 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
         </span>
       )}
 
-      {img && (
-        <div className="flex flex-col gap-1">
-          <img
-            src={img}
-            alt="生成結果"
-            className="nodrag w-full cursor-zoom-in rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
-            onClick={() => setZoom(true)}
-            onContextMenu={(e) => {
-              if (!d.lastImagePath) return
-              e.preventDefault()
-              e.stopPropagation()
-              setMenu({ x: e.clientX, y: e.clientY })
-            }}
-          />
-          {seed != null && <span className="text-[10px] text-[var(--text-faint)]">seed: {seed}</span>}
+      {images.length > 0 && (
+        <div className={images.length > 1 ? 'grid grid-cols-2 gap-1' : 'flex flex-col gap-1'}>
+          {images.map((im, i) => (
+            <div key={`${im.path}-${i}`} className="flex flex-col gap-0.5">
+              <img
+                src={im.url}
+                alt={im.label || '生成結果'}
+                className="nodrag w-full cursor-zoom-in rounded-[8px] border border-[var(--border-strong)] bg-black/20 object-contain"
+                onClick={() => setZoomUrl(im.url)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setMenu({ x: e.clientX, y: e.clientY, path: im.path })
+                }}
+              />
+              <span
+                className="truncate text-[9px] text-[var(--text-faint)]"
+                title={im.label}
+              >
+                {im.label ? `${im.label} · ` : ''}
+                {im.seed != null ? `seed: ${im.seed}` : ''}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1080,7 +1127,7 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
             <button
               className="block w-full rounded-[6px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
               onClick={() => {
-                window.api.showItemInFolder(d.lastImagePath)
+                window.api.showItemInFolder(menu.path)
                 setMenu(null)
               }}
             >
@@ -1090,16 +1137,15 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
           document.body
         )}
 
-      {zoom &&
-        img &&
+      {zoomUrl &&
         createPortal(
           <div
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-8 backdrop-blur-md"
-            onClick={() => setZoom(false)}
+            onClick={() => setZoomUrl(null)}
             onContextMenu={(e) => e.preventDefault()}
           >
             <img
-              src={img}
+              src={zoomUrl}
               alt="生成結果（拡大）"
               className="max-h-full max-w-full cursor-zoom-out rounded-[10px] object-contain shadow-2xl"
             />

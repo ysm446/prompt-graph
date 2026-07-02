@@ -125,8 +125,7 @@ export function defaultData(kind: NodeKind): NodeData {
         cfg: 7,
         width: 1280,
         height: 960,
-        lastImagePath: '',
-        lastSeed: null
+        lastImages: []
       }
     case 'scene':
       return {
