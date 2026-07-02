@@ -63,6 +63,7 @@ interface GraphState {
   saveActive: () => Promise<void>
   renameWorkspace: (id: string, name: string) => Promise<void>
   deleteWorkspace: (id: string) => Promise<void>
+  reorderWorkspaces: (ids: string[]) => Promise<void>
 }
 
 function toRFNode(n: GraphNode): RFNode {
@@ -320,6 +321,14 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       await window.api.renameWorkspace(id, name)
       await get().refreshWorkspaces()
     }
+  },
+
+  reorderWorkspaces: async (ids) => {
+    // 楽観的にローカル順を更新してから永続化
+    const map = new Map(get().workspaces.map((w) => [w.id, w]))
+    const next = ids.map((id) => map.get(id)).filter((w): w is WorkspaceMeta => !!w)
+    set({ workspaces: next })
+    await window.api.reorderWorkspaces(ids)
   },
 
   deleteWorkspace: async (id) => {

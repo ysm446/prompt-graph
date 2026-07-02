@@ -7,6 +7,7 @@ export const IPC = {
   workspaceCreate: 'workspace:create',
   workspaceRename: 'workspace:rename',
   workspaceDelete: 'workspace:delete',
+  workspaceReorder: 'workspace:reorder',
   settingsGet: 'settings:get',
   settingsSave: 'settings:save',
   llamaReleases: 'llama:releases',

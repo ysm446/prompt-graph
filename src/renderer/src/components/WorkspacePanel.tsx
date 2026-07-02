@@ -22,10 +22,23 @@ export function WorkspacePanel() {
   const saveActive = useGraphStore((s) => s.saveActive)
   const renameWorkspace = useGraphStore((s) => s.renameWorkspace)
   const deleteWorkspace = useGraphStore((s) => s.deleteWorkspace)
+  const reorderWorkspaces = useGraphStore((s) => s.reorderWorkspaces)
 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [menu, setMenu] = useState<WsMenu | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+
+  const handleDrop = (targetId: string) => {
+    setOverId(null)
+    if (!dragId || dragId === targetId) return
+    const ids = workspaces.map((w) => w.id).filter((id) => id !== dragId)
+    const to = ids.indexOf(targetId)
+    ids.splice(to, 0, dragId) // ターゲットの前に挿入
+    setDragId(null)
+    void reorderWorkspaces(ids)
+  }
 
   const beginRename = (id: string, current: string) => {
     setRenamingId(id)
@@ -73,8 +86,23 @@ export function WorkspacePanel() {
           return (
             <div
               key={ws.id}
+              draggable={renamingId !== ws.id}
+              onDragStart={() => setDragId(ws.id)}
+              onDragEnd={() => {
+                setDragId(null)
+                setOverId(null)
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                if (overId !== ws.id) setOverId(ws.id)
+              }}
+              onDrop={() => handleDrop(ws.id)}
               className={`group mx-1 mb-0.5 flex items-center gap-1 rounded px-2 py-1.5 ${
                 isActive ? 'bg-[#2a2e3f]' : 'hover:bg-[#1f2230]'
+              } ${dragId === ws.id ? 'opacity-40' : ''} ${
+                overId === ws.id && dragId && dragId !== ws.id
+                  ? 'shadow-[inset_0_2px_0_0_#7aa2f7]'
+                  : ''
               }`}
               onContextMenu={(e) => {
                 e.preventDefault()
@@ -135,7 +163,7 @@ export function WorkspacePanel() {
       </div>
 
       <div className="border-t border-[#2a2e3f] px-3 py-2 text-[10px] text-[#565f89]">
-        右クリックでメニュー / ダブルクリックで名前変更 / Ctrl+S で保存
+        ドラッグで並べ替え / 右クリックでメニュー / ダブルクリックで名前変更
       </div>
 
       {menu &&

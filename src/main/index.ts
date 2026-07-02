@@ -78,6 +78,7 @@ function registerIpc(): void {
     store.renameWorkspace(id, name)
   )
   ipcMain.handle(IPC.workspaceDelete, (_e, id: string) => store.deleteWorkspace(id))
+  ipcMain.handle(IPC.workspaceReorder, (_e, ids: string[]) => store.saveWorkspaceOrder(ids))
 
   ipcMain.handle(IPC.settingsGet, () => store.getSettings())
   ipcMain.handle(IPC.settingsSave, (_e, settings: AppSettings) => store.saveSettings(settings))

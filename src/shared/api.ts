@@ -36,6 +36,7 @@ export interface PromptGraphApi {
   createWorkspace(name: string): Promise<ProjectSnapshot>
   renameWorkspace(id: string, name: string): Promise<void>
   deleteWorkspace(id: string): Promise<void>
+  reorderWorkspaces(ids: string[]): Promise<void>
 
   getSettings(): Promise<AppSettings>
   saveSettings(settings: AppSettings): Promise<void>

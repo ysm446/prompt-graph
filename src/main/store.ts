@@ -86,16 +86,32 @@ export class Store {
     await this.migrateLegacyProject()
     if (!existsSync(this.workspacesDir)) return []
     const files = (await readdir(this.workspacesDir)).filter((f) => f.endsWith('.json'))
-    const metas: Array<WorkspaceMeta & { _mtime: number }> = []
+    const metas: Array<WorkspaceMeta & { _sort: number }> = []
     for (const file of files) {
       const full = join(this.workspacesDir, file)
       const snap = await this.readJson<ProjectSnapshot | null>(full, null)
       if (!snap?.id) continue
-      const { mtimeMs } = await stat(full)
-      metas.push({ id: snap.id, name: snap.name, updatedAt: new Date(mtimeMs).toISOString(), _mtime: mtimeMs })
+      const { mtimeMs, birthtimeMs } = await stat(full)
+      metas.push({
+        id: snap.id,
+        name: snap.name,
+        updatedAt: new Date(mtimeMs).toISOString(),
+        _sort: birthtimeMs || mtimeMs // 未登録分のフォールバック順（作成順）
+      })
     }
-    metas.sort((a, b) => b._mtime - a._mtime)
-    return metas.map(({ _mtime, ...m }) => m)
+    // 明示順(workspace-order.json)を優先し、未登録は作成順で後ろに付ける
+    const order = await this.readJson<string[]>(this.path('workspace-order.json'), [])
+    const rank = new Map(order.map((id, i) => [id, i]))
+    metas.sort((a, b) => {
+      const ai = rank.has(a.id) ? (rank.get(a.id) as number) : Infinity
+      const bi = rank.has(b.id) ? (rank.get(b.id) as number) : Infinity
+      return ai !== bi ? ai - bi : a._sort - b._sort
+    })
+    return metas.map(({ _sort, ...m }) => m)
+  }
+
+  saveWorkspaceOrder(ids: string[]): Promise<void> {
+    return this.writeJson(this.path('workspace-order.json'), ids)
   }
 
   loadWorkspace(id: string): Promise<ProjectSnapshot | null> {

@@ -33,6 +33,8 @@ const api: PromptGraphApi = {
   renameWorkspace: (id: string, name: string): Promise<void> =>
     ipcRenderer.invoke(IPC.workspaceRename, id, name),
   deleteWorkspace: (id: string): Promise<void> => ipcRenderer.invoke(IPC.workspaceDelete, id),
+  reorderWorkspaces: (ids: string[]): Promise<void> =>
+    ipcRenderer.invoke(IPC.workspaceReorder, ids),
 
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.settingsGet),
   saveSettings: (settings: AppSettings): Promise<void> =>
