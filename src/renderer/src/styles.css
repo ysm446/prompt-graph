@@ -2,49 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
+/* デザイントークン（lm-graph と共通のダークテーマ） */
+:root {
+  color-scheme: dark;
+  --bg: #0d0f14;
+  --bg-sidebar: #111318;
+  --bg-canvas: #181b23;
+  --bg-input: #1a1d27;
+  --bg-card: #1c1f2b;
+  --bg-elevated: rgba(32, 35, 48, 0.5);
+  --border: #252830;
+  --border-strong: #2e3140;
+  --text: #e2e4ef;
+  --text-dim: #9499b0;
+  --text-faint: #5c6078;
+  --accent: #7c5af7;
+  --accent-hover: #6d4de6;
+  --accent-soft: rgba(124, 90, 247, 0.12);
+  --accent-border: rgba(124, 90, 247, 0.35);
+  --danger: #ef4444;
+  font-family: 'Inter', 'Segoe UI', 'Noto Sans JP', system-ui, sans-serif;
+}
+
 html,
 body,
 #root {
   margin: 0;
   height: 100%;
-  font-family: system-ui, 'Segoe UI', sans-serif;
 }
 
-/* React Flow のダーク調整 */
-.react-flow__controls button {
-  background: #1a1b26;
-  border-color: #2a2e3f;
-  color: #c0caf5;
-}
-.react-flow__controls button:hover {
-  background: #2a2e3f;
+body {
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* ピン（ハンドル）。見た目は小さいドットのまま。
-   当たり判定だけ ::before（透明な拡張領域）で広げる。
-   ハンドル本体のサイズは変えないので、エッジの接続点はドット中心と一致する。 */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* React Flow: MiniMap */
+.react-flow__minimap {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.react-flow__minimap-mask {
+  fill: var(--accent-soft);
+  stroke: var(--accent-border);
+  stroke-width: 1;
+}
+
+/* React Flow: Controls（未使用だがテーマだけ用意） */
+.react-flow__controls {
+  box-shadow: none;
+}
+
+.react-flow__controls,
+.react-flow__controls-button {
+  background: rgba(17, 19, 24, 0.96);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* エッジをノードの下に描画 */
+.react-flow__edges,
+.react-flow__edge-labels {
+  z-index: 0 !important;
+}
+
+.react-flow__nodes {
+  z-index: 1 !important;
+}
+
+.react-flow__node {
+  z-index: auto !important;
+}
+
+.react-flow__pane {
+  cursor: default !important;
+}
+
+/* ドラッグ選択の矩形 */
+.react-flow__selection {
+  background: rgba(128, 101, 255, 0.08) !important;
+  border: 1px solid rgba(128, 101, 255, 0.55) !important;
+  border-radius: 8px;
+}
+
+.react-flow__nodesselection,
+.react-flow__nodesselection-rect {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.react-flow__nodesselection-rect:focus {
+  outline: none !important;
+}
+
+/* ピン（ハンドル）。塗り = 種別アクセント（インライン指定）、
+   縁 = キャンバス色でノード枠から浮かせる。
+   当たり判定だけ ::before（透明な拡張領域）で広げる。 */
 .react-flow__handle {
-  width: 7px;
-  height: 7px;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--bg-canvas);
 }
 .react-flow__handle::before {
   content: '';
   position: absolute;
-  inset: -8px; /* 上下左右に 8px 拡張 → 実クリック領域 約23px */
+  inset: -6px; /* 実クリック領域 約25px */
   border-radius: 9999px;
 }
 .react-flow__handle:hover {
-  box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.5);
+  box-shadow: 0 0 0 3px var(--accent-border);
 }
 
 /* ノードのリサイズ（右下コーナー）。選択中のみ表示。 */
 .react-flow__resize-control.handle {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  background: #3a3f55;
-  border: 1px solid #1a1b26;
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--text);
+  border: 1px solid var(--text-faint);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .react-flow__resize-control.handle:hover {
-  background: #7aa2f7;
+  background: #ffffff;
+}
+
+/* ノード本文のスクロールバー */
+.node-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3f50 transparent;
+}
+
+.node-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.node-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.node-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a3f50;
+  border-radius: 999px;
+  border: 2px solid transparent;
+}
+
+.node-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a5166;
 }

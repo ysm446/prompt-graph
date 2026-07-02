@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
+  ConnectionLineType,
   MiniMap,
   Panel,
   ReactFlow,
@@ -11,7 +12,8 @@ import {
 import '@xyflow/react/dist/style.css'
 import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
-import { nodeTypes } from './graph/nodes'
+import { ACCENT, nodeTypes } from './graph/nodes'
+import { edgeTypes } from './graph/edges'
 import { NODE_LABELS, SCENE_INPUTS } from './graph/factory'
 import { useGraphStore } from './store/graphStore'
 import { CompilePanel } from './components/CompilePanel'
@@ -55,17 +57,17 @@ function AddNodePanel() {
   return (
     <div className="relative">
       <button
-        className="flex items-center gap-1 rounded border border-[#2a2e3f] bg-[#1a1b26] px-2 py-1 text-xs text-[#c0caf5] hover:border-[#7aa2f7]"
+        className="flex items-center gap-1 rounded-[10px] border border-[var(--border-strong)] bg-[rgba(17,19,24,0.9)] px-2.5 py-1.5 text-xs text-[var(--text-dim)] transition hover:bg-white/5 hover:text-[var(--text)]"
         onClick={() => setOpen((v) => !v)}
       >
         <Plus size={14} /> ノード追加 <ChevronDown size={12} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 min-w-40 rounded-md border border-[#2a2e3f] bg-[#1a1b26] py-1 text-xs shadow-2xl">
+        <div className="absolute left-0 top-full mt-1 min-w-40 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] p-1 text-xs shadow-2xl">
           {ADD_ORDER.map((kind) => (
             <button
               key={kind}
-              className="block w-full px-3 py-1.5 text-left text-[#c0caf5] hover:bg-[#2a2e3f]"
+              className="block w-full rounded-[8px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
               onClick={() => handleAdd(kind)}
             >
               + {NODE_LABELS[kind]}
@@ -177,20 +179,25 @@ function Canvas() {
         fitView
         deleteKeyCode={['Delete', 'Backspace']}
         connectionRadius={45}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ interactionWidth: 28 }}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{ stroke: '#6a728f', strokeWidth: 2.6, opacity: 0.84 }}
+        style={{ backgroundColor: 'var(--bg-canvas)' }}
+        minZoom={0.1}
+        maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Panel position="top-left">
           <AddNodePanel />
         </Panel>
-        <Background color="#2a2e3f" gap={20} />
+        <Background color="#394154" gap={20} size={1.4} />
         {showMinimap && (
           <MiniMap
             pannable
             zoomable
-            bgColor="#16171f"
-            maskColor="rgba(15,17,21,0.6)"
-            nodeColor="#2a2e3f"
-            nodeStrokeColor="#3a3f55"
+            nodeColor={(n) => `${ACCENT[n.type as NodeKind] ?? '#3f4150'}59`}
+            nodeStrokeColor="none"
           />
         )}
       </ReactFlow>
@@ -199,18 +206,18 @@ function Canvas() {
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} onContextMenu={(e) => e.preventDefault()} />
           <div
-            className="fixed z-50 min-w-44 overflow-hidden rounded-md border border-[#2a2e3f] bg-[#1a1b26] py-1 text-xs text-[#c0caf5] shadow-2xl"
+            className="fixed z-50 min-w-44 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] p-1 text-xs text-[var(--text)] shadow-2xl"
             style={{ left: Math.min(menu.x, window.innerWidth - 200), top: Math.min(menu.y, window.innerHeight - 320) }}
           >
             {menu.kind === 'pane' ? (
               <>
-                <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-[#565f89]">
+                <div className="px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
                   ノードを追加
                 </div>
                 {ADD_ORDER.map((kind) => (
                   <button
                     key={kind}
-                    className="block w-full px-3 py-1.5 text-left hover:bg-[#2a2e3f]"
+                    className="block w-full rounded-[8px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
                     onClick={() => {
                       addNode(kind, menu.flow)
                       setMenu(null)
@@ -222,11 +229,11 @@ function Canvas() {
               </>
             ) : (
               <>
-                <div className="truncate px-3 py-1 text-[10px] uppercase tracking-wide text-[#565f89]">
+                <div className="truncate px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
                   {menu.label}
                 </div>
                 <button
-                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[#f7768e] hover:bg-[#2a2e3f]"
+                  className="flex w-full items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-left text-[var(--danger)] hover:bg-white/5"
                   onClick={() => {
                     removeNode(menu.nodeId)
                     setMenu(null)
@@ -268,19 +275,19 @@ export default function App() {
 
   return (
     <ReactFlowProvider>
-      <div className="flex h-screen w-screen flex-col bg-[#0f1115] text-[#c0caf5]">
+      <div className="flex h-screen w-screen flex-col bg-[var(--bg)] text-[var(--text)]">
         <ModelBar />
         <div className="flex flex-1 overflow-hidden">
           <WorkspacePanel />
           <main className="relative flex-1">
             <Canvas />
           </main>
-          <aside className="w-96 overflow-y-auto border-l border-[#2a2e3f] bg-[#16171f] p-3">
+          <aside className="w-96 overflow-y-auto border-l border-[var(--border)] bg-[var(--bg-sidebar)] p-3">
             <CompilePanel />
           </aside>
         </div>
         {/* 下部ステータスバー（右端にシステムリソース） */}
-        <footer className="flex h-6 shrink-0 items-center justify-end border-t border-[#2a2e3f] bg-[#16171f] px-3">
+        <footer className="flex h-6 shrink-0 items-center justify-end border-t border-[var(--border)] bg-[var(--bg-sidebar)] px-3">
           <SystemResourceMonitor />
         </footer>
       </div>

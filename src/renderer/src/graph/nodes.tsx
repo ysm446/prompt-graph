@@ -23,7 +23,7 @@ import { useGraphStore } from '../store/graphStore'
 import type { RFNode } from '../store/graphStore'
 import { SCENE_INPUTS } from './factory'
 
-const ACCENT: Record<NodeKind, string> = {
+export const ACCENT: Record<NodeKind, string> = {
   character: '#7aa2f7',
   soloAction: '#9ece6a',
   interaction: '#e0af68',
@@ -83,6 +83,7 @@ function Shell({
   title,
   selected,
   children,
+  beforeBody,
   inputs,
   hasOutput = true
 }: {
@@ -91,34 +92,35 @@ function Shell({
   title: string
   selected?: boolean
   children: ReactNode
+  /** ヘッダー直後・スクロール領域の外に置く内容（Scene の入力ピン列など。ハンドルが切れないようにする） */
+  beforeBody?: ReactNode
   inputs?: { id: string; label: string; top: number }[]
   hasOutput?: boolean
 }) {
   const accent = ACCENT[kind]
+  const Icon = NODE_ICONS[kind]
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden rounded-lg border bg-[#1a1b26] text-[#c0caf5] shadow-lg"
-      style={{
-        borderColor: selected ? accent : '#2a2e3f',
-        boxShadow: selected ? `0 0 0 1px ${accent}` : undefined
-      }}
+      className={`relative flex h-full w-full flex-col rounded-2xl border-2 bg-[var(--bg-card)] text-[var(--text)] shadow-lg shadow-black/30 ${
+        selected ? 'ring-4 ring-[var(--accent-border)]' : ''
+      }`}
+      style={{ borderColor: `color-mix(in srgb, ${accent} 60%, var(--bg-card))` }}
     >
       {/* 右下コーナーで縦横リサイズ（選択中のみ表示）。
           高さ未指定なら内容に追従、縮めた場合のみ本文がスクロール。 */}
       {selected && (
         <NodeResizeControl position="bottom-right" minWidth={180} minHeight={80} maxWidth={680} />
       )}
-      <div
-        className="flex shrink-0 items-center gap-1.5 rounded-t-lg px-3 py-1.5 text-xs font-semibold tracking-wide"
-        style={{ background: accent, color: '#11131a' }}
-      >
-        {(() => {
-          const Icon = NODE_ICONS[kind]
-          return <Icon size={14} strokeWidth={2.25} />
-        })()}
-        {title}
+      <div className="flex shrink-0 items-center gap-1.5 px-4 pb-1 pt-2.5">
+        <Icon size={13} strokeWidth={2.25} style={{ color: accent }} />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-dim)]">
+          {title}
+        </span>
       </div>
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">{children}</div>
+      {beforeBody}
+      <div className="node-scrollbar flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3 pt-1">
+        {children}
+      </div>
 
       {(inputs ?? []).map((h) => (
         <Handle
@@ -139,7 +141,7 @@ function Shell({
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-[#565f89]">
+    <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-[var(--text-faint)]">
       {label}
       {children}
     </label>
@@ -147,7 +149,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const inputCls =
-  'nodrag rounded border border-[#2a2e3f] bg-[#11131a] px-2 py-1 text-xs text-[#c0caf5] outline-none placeholder:text-[#363b4d] focus:border-[#7aa2f7]'
+  'nodrag rounded-[8px] border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--accent-border)]'
 
 function TextInput(props: {
   value: string
@@ -246,7 +248,7 @@ function TagNode(kind: 'soloAction' | 'interaction' | 'background' | 'lighting' 
     return (
       <Shell id={id} kind={kind} title={d.label} selected={selected} inputs={inputs}>
         {kind === 'soloAction' && (
-          <p className="text-[10px] text-[#565f89]">← Character を接続（鎖: char → action → scene）</p>
+          <p className="text-[10px] text-[var(--text-faint)]">← Character を接続（鎖: char → action → scene）</p>
         )}
         <Field label="tags">
           <Area value={d.tags} onChange={(v) => update({ tags: v })} placeholder="comma, separated, tags" />
@@ -392,8 +394,8 @@ function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
   }
 
   return (
-    <div className="-mx-3 mt-1 border-t border-[#2a2e3f] px-3 pt-2">
-      <label className="flex items-center gap-2 text-[10px] text-[#565f89]">
+    <div className="-mx-4 mt-1 border-t border-[var(--border)] px-4 pt-2">
+      <label className="flex items-center gap-2 text-[10px] text-[var(--text-faint)]">
         <input
           type="checkbox"
           className="nodrag"
@@ -407,7 +409,7 @@ function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
         <div className="mt-1.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
             <button
-              className="nodrag rounded bg-[#bb9af7] px-2 py-0.5 text-[10px] font-semibold text-[#11131a] hover:opacity-90 disabled:opacity-40"
+              className="nodrag rounded-[8px] bg-[rgba(68,54,124,0.96)] px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[rgba(82,66,146,0.98)] disabled:opacity-40"
               onClick={run}
               disabled={busy || !running}
             >
@@ -416,17 +418,19 @@ function VisibilitySection({ id, d }: { id: string; d: SceneData }) {
             {!running && <span className="text-[10px] text-[#e0af68]">モデルをロードしてください</span>}
           </div>
 
-          {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+          {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
 
-          <div className="text-[10px] text-[#565f89]">
+          <div className="text-[10px] text-[var(--text-faint)]">
             除去トークン（クリックで戻す / 手修正可）:
           </div>
           <div className="flex flex-wrap gap-1">
-            {removed.length === 0 && <span className="text-[10px] text-[#3a3f55]">なし</span>}
+            {removed.length === 0 && (
+              <span className="text-[10px] text-[var(--text-faint)] opacity-60">なし</span>
+            )}
             {removed.map((t) => (
               <button
                 key={t}
-                className="nodrag flex items-center gap-1 rounded bg-[#2a2e3f] px-1.5 py-0.5 text-[10px] text-[#f7768e] hover:bg-[#3a3f55]"
+                className="nodrag flex items-center gap-1 rounded-[6px] border border-[var(--border-strong)] bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[10px] text-[var(--danger)] hover:bg-white/5"
                 title="クリックで除去を取り消す"
                 onClick={() => update({ visibilityRemoved: removed.filter((x) => x !== t) })}
               >
@@ -460,25 +464,32 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
   const d = data as Extract<NodeData, { kind: 'scene' }>
   const update = useUpdate(id)
   return (
-    <Shell id={id} kind="scene" title={d.label} selected={selected}>
-      {/* カテゴリ別入力ピン（誤接続防止 + 見やすさ） */}
-      <div className="-mx-3 mb-1 border-b border-[#2a2e3f] pb-1">
-        {SCENE_INPUTS.map((pin) => (
-          <div
-            key={pin.id}
-            className="relative flex h-[22px] items-center pl-3 text-[10px] text-[#565f89]"
-          >
-            <Handle
-              id={pin.id}
-              type="target"
-              position={Position.Left}
-              style={{ backgroundColor: ACCENT[pin.kinds[0]] }}
-            />
-            {pin.label}
-          </div>
-        ))}
-      </div>
-      <label className="flex items-center gap-2 text-[10px] text-[#565f89]">
+    <Shell
+      id={id}
+      kind="scene"
+      title={d.label}
+      selected={selected}
+      // カテゴリ別入力ピン（誤接続防止 + 見やすさ）。スクロール外に置きハンドルの見切れを防ぐ
+      beforeBody={
+        <div className="mb-1 border-b border-[var(--border)] pb-1">
+          {SCENE_INPUTS.map((pin) => (
+            <div
+              key={pin.id}
+              className="relative flex h-[22px] items-center pl-4 text-[10px] text-[var(--text-faint)]"
+            >
+              <Handle
+                id={pin.id}
+                type="target"
+                position={Position.Left}
+                style={{ backgroundColor: ACCENT[pin.kinds[0]] }}
+              />
+              {pin.label}
+            </div>
+          ))}
+        </div>
+      }
+    >
+      <label className="flex items-center gap-2 text-[10px] text-[var(--text-faint)]">
         <input
           type="checkbox"
           className="nodrag"
@@ -488,7 +499,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
         人数タグを自動付与
       </label>
       {d.peopleTagAuto ? (
-        <label className="flex items-center gap-2 pl-4 text-[10px] text-[#565f89]">
+        <label className="flex items-center gap-2 pl-4 text-[10px] text-[var(--text-faint)]">
           <input
             type="checkbox"
             className="nodrag"
@@ -502,7 +513,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
           <TextInput value={d.peopleTag} onChange={(v) => update({ peopleTag: v })} placeholder="1girl, 1boy" />
         </Field>
       )}
-      <label className="flex items-center gap-2 text-[10px] text-[#565f89]">
+      <label className="flex items-center gap-2 text-[10px] text-[var(--text-faint)]">
         <input
           type="checkbox"
           className="nodrag"
@@ -593,7 +604,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
   return (
     <Shell id={id} kind="reference" title={d.label} selected={selected} hasOutput={false}>
       <button
-        className="nodrag rounded bg-[#2a2e3f] py-1 text-xs hover:bg-[#3a3f55]"
+        className="nodrag rounded-[10px] border border-[var(--border-strong)] bg-[rgba(28,31,43,0.92)] py-1 text-xs text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
         onClick={load}
       >
         画像を読み込む
@@ -602,10 +613,10 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
         <img
           src={preview}
           alt={fileName}
-          className="max-h-40 w-full rounded border border-[#2a2e3f] object-contain"
+          className="max-h-40 w-full rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
         />
       )}
-      {fileName && <div className="truncate text-[10px] text-[#565f89]">{fileName}</div>}
+      {fileName && <div className="truncate text-[10px] text-[var(--text-faint)]">{fileName}</div>}
 
       <Field label="positive (抽出)">
         <Area value={d.positive} onChange={(v) => update({ positive: v })} rows={3} />
@@ -613,7 +624,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
 
       <div className="flex items-center gap-2">
         <button
-          className="nodrag rounded bg-[#7dcfff] px-2 py-0.5 text-[10px] font-semibold text-[#11131a] hover:opacity-90 disabled:opacity-40"
+          className="nodrag rounded-[8px] bg-[rgba(68,54,124,0.96)] px-2.5 py-1 text-[10px] font-medium text-white hover:bg-[rgba(82,66,146,0.98)] disabled:opacity-40"
           onClick={decompose}
           disabled={busy || !running || !d.positive.trim()}
         >
@@ -621,7 +632,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
         </button>
         {!running && <span className="text-[10px] text-[#e0af68]">要モデルロード</span>}
       </div>
-      {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+      {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
 
       {BUCKET_LABELS.map(({ key, label }) => (
         <Field key={key} label={label}>
@@ -632,7 +643,7 @@ export function ReferenceNode({ id, data, selected }: NodeProps<RFNode>) {
           />
         </Field>
       ))}
-      <p className="text-[10px] text-[#565f89]">
+      <p className="text-[10px] text-[var(--text-faint)]">
         ※ Scene スロットへの上書き接続は今後対応（現状は分解の確認・編集用）
       </p>
     </Shell>
@@ -667,7 +678,7 @@ export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
       hasOutput={false}
       inputs={[{ id: 'scene', label: 'Scene', top: 36 }]}
     >
-      <p className="text-[10px] text-[#565f89]">← Scene を接続</p>
+      <p className="text-[10px] text-[var(--text-faint)]">← Scene を接続</p>
       <Field label="展開モード">
         <select
           className={inputCls}
@@ -699,28 +710,28 @@ export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
       </Field>
 
       <button
-        className="nodrag rounded bg-[#f7768e] py-1 text-xs font-semibold text-[#11131a] hover:opacity-90"
+        className="nodrag rounded-[10px] bg-[rgba(68,54,124,0.96)] py-1.5 text-xs font-medium text-white hover:bg-[rgba(82,66,146,0.98)]"
         onClick={run}
       >
         ドライラン
       </button>
-      {err && <span className="text-[10px] text-[#f7768e]">{err}</span>}
+      {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
 
       {result && (
-        <div className="flex flex-col gap-1 text-[10px] text-[#c0caf5]">
+        <div className="flex flex-col gap-1 text-[10px] text-[var(--text)]">
           <div>
             総数 <span className="text-[#ff9e64]">{result.total}</span> / 展開{' '}
             <span className="text-[#9ece6a]">{result.planned}</span>
           </div>
           {result.axes.length === 0 ? (
-            <div className="text-[#565f89]">スイープ軸なし（Camera 複数プリセット / Seed 複数値で増えます）</div>
+            <div className="text-[var(--text-faint)]">スイープ軸なし（Camera 複数プリセット / Seed 複数値で増えます）</div>
           ) : (
-            <div className="text-[#565f89]">
+            <div className="text-[var(--text-faint)]">
               軸: {result.axes.map((a) => `${a.label}×${a.count}`).join(', ')}
             </div>
           )}
           {result.samples.map((s, i) => (
-            <div key={i} className="rounded bg-[#11131a] p-1">
+            <div key={i} className="rounded-[8px] bg-[var(--bg-input)] p-1.5">
               <div className="text-[#7aa2f7]">{s.overridesLabel}</div>
               <div className="whitespace-pre-wrap break-words text-[#9ece6a]">{s.positive}</div>
             </div>

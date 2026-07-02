@@ -2,6 +2,17 @@
 
 > 新しい記録を各セクションの上に追記する。日付は `YYYY-MM-DD`。
 
+## 2026-07-02 (ノードグラフのデザインを lm-graph に統一)
+
+- lm-graph のデザイン言語（CSS 変数トークン / カード型ノード / 種別色エッジ）を移植。
+  - `styles.css`: `:root` に lm-graph と同じトークン（`--bg-card` `#1c1f2b`, `--border-strong`, `--accent` `#7c5af7` 等）を定義。MiniMap / Controls / 選択矩形 / ハンドル / リサイズコーナーの React Flow 上書きも lm-graph 準拠に。フォントに Inter / Noto Sans JP を追加。
+  - `graph/nodes.tsx` の `Shell`: べた塗りヘッダー → 「カード背景 + 種別色の 2px 枠（`color-mix` で 60% ミュート）+ `rounded-2xl` + アクセント色アイコン + uppercase 種別ラベル」。選択時は紫 `ring-4`（lm-graph と同じ）。本文は `node-scrollbar` 付きスクロール。Scene の入力ピン列は `beforeBody`（スクロール外）に移し 13px ハンドルの見切れを防止。
+  - ハンドル: 7px → 13px の縁取りドット（塗り=種別アクセント、縁=キャンバス色）。::before の当たり判定拡張は維持。
+  - `graph/edges.tsx`（新規）: 接続元ノードの種別色で着色する角丸 smoothstep エッジ（`borderRadius:40`, 太さ 2.6 / 選択時 3.5）。`edgeTypes.default` を上書きするので保存済みエッジにもそのまま適用。
+  - `App.tsx`: キャンバス `--bg-canvas` `#181b23` + ドットグリッド `#394154`、MiniMap を種別色ノード表示に、ノード追加パネル / 右クリックメニュー / アプリ外枠をトークンベースに更新。
+  - ACCENT（種別 12 色）はそのまま維持（枠・ハンドル・エッジ・MiniMap の一貫した色分けの単一ソース）。
+- 検証: typecheck / build 通過。Playwright(_electron) で実起動し、実ワークスペース（12 ノード・9 エッジ）で新デザイン（カード / 種別色エッジ / 選択リング / リサイズ）をスクリーンショット確認。
+
 ## 2026-06-29 (Batch / Reference / Seed モード)
 
 - **Batch ノード**（spec §4.12）: Scene→Batch 接続。多値軸（Camera プリセット>1, Seed 値>1）の直積を計算し、**ドライラン**（総数・展開数・軸一覧・サンプルプロンプト）を表示。展開モード（全列挙/ランダム抽出/固定）。`shared/batch.ts`、`compileScene` に overrides 引数。実生成（Forge ジョブ発行）は後段。
