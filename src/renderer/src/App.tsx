@@ -10,7 +10,7 @@ import {
   type OnSelectionChangeParams
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ClipboardPaste, Copy, Plus, Trash2 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
 import { ACCENT, nodeTypes } from './graph/nodes'
 import { edgeTypes } from './graph/edges'
@@ -89,6 +89,9 @@ function Canvas() {
   const setSelected = useGraphStore((s) => s.setSelected)
   const removeNode = useGraphStore((s) => s.removeNode)
   const addNode = useGraphStore((s) => s.addNode)
+  const copyNodes = useGraphStore((s) => s.copyNodes)
+  const pasteNodes = useGraphStore((s) => s.pasteNodes)
+  const hasClipboard = useGraphStore((s) => s.hasClipboard)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<Menu | null>(null)
   const [showMinimap, setShowMinimap] = useState(true)
@@ -159,7 +162,24 @@ function Canvas() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenu(null)
+      if (e.key === 'Escape') {
+        setMenu(null)
+        return
+      }
+      // 入力欄にフォーカス中は通常のテキストコピペを優先
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key.toLowerCase() === 'c') {
+        const ids = useGraphStore
+          .getState()
+          .nodes.filter((n) => n.selected)
+          .map((n) => n.id)
+        if (ids.length) useGraphStore.getState().copyNodes(ids)
+      } else if (mod && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        useGraphStore.getState().pasteNodes()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -218,6 +238,20 @@ function Canvas() {
           >
             {menu.kind === 'pane' ? (
               <>
+                {hasClipboard && (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
+                      onClick={() => {
+                        pasteNodes(menu.flow)
+                        setMenu(null)
+                      }}
+                    >
+                      <ClipboardPaste size={13} /> 貼り付け
+                    </button>
+                    <div className="my-1 h-px bg-[var(--border)]" />
+                  </>
+                )}
                 <div className="px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
                   ノードを追加
                 </div>
@@ -239,6 +273,17 @@ function Canvas() {
                 <div className="truncate px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--text-faint)]">
                   {menu.label}
                 </div>
+                <button
+                  className="flex w-full items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
+                  onClick={() => {
+                    // 選択に含まれていればその選択群を、そうでなければこのノードのみコピー
+                    const selected = useGraphStore.getState().nodes.filter((n) => n.selected).map((n) => n.id)
+                    copyNodes(selected.includes(menu.nodeId) ? selected : [menu.nodeId])
+                    setMenu(null)
+                  }}
+                >
+                  <Copy size={13} /> コピー
+                </button>
                 <button
                   className="flex w-full items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-left text-[var(--danger)] hover:bg-white/5"
                   onClick={() => {

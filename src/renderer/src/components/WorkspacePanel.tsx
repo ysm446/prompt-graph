@@ -1,6 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Save, X } from 'lucide-react'
 import { useGraphStore } from '../store/graphStore'
+
+interface WsMenu {
+  id: string
+  name: string
+  isActive: boolean
+  x: number
+  y: number
+}
 
 export function WorkspacePanel() {
   const workspaces = useGraphStore((s) => s.workspaces)
@@ -9,12 +18,14 @@ export function WorkspacePanel() {
   const activeName = useGraphStore((s) => s.name)
   const switchWorkspace = useGraphStore((s) => s.switchWorkspace)
   const createWorkspace = useGraphStore((s) => s.createWorkspace)
+  const duplicateWorkspace = useGraphStore((s) => s.duplicateWorkspace)
   const saveActive = useGraphStore((s) => s.saveActive)
   const renameWorkspace = useGraphStore((s) => s.renameWorkspace)
   const deleteWorkspace = useGraphStore((s) => s.deleteWorkspace)
 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [menu, setMenu] = useState<WsMenu | null>(null)
 
   const beginRename = (id: string, current: string) => {
     setRenamingId(id)
@@ -24,6 +35,18 @@ export function WorkspacePanel() {
     if (renamingId) void renameWorkspace(renamingId, draft.trim() || 'untitled')
     setRenamingId(null)
   }
+
+  const remove = (id: string, name: string) => {
+    if (confirm(`「${name}」を削除しますか？`)) void deleteWorkspace(id)
+  }
+
+  // メニューの外側クリックで閉じる
+  useEffect(() => {
+    if (!menu) return
+    const close = (): void => setMenu(null)
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [menu])
 
   return (
     <aside className="flex w-60 flex-col border-r border-[#2a2e3f] bg-[#16171f] text-xs text-[#c0caf5]">
@@ -53,6 +76,10 @@ export function WorkspacePanel() {
               className={`group mx-1 mb-0.5 flex items-center gap-1 rounded px-2 py-1.5 ${
                 isActive ? 'bg-[#2a2e3f]' : 'hover:bg-[#1f2230]'
               }`}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setMenu({ id: ws.id, name: displayName, isActive, x: e.clientX, y: e.clientY })
+              }}
             >
               {renamingId === ws.id ? (
                 <input
@@ -97,9 +124,7 @@ export function WorkspacePanel() {
               {/* 削除 */}
               <button
                 className="flex items-center rounded p-1 text-[#565f89] opacity-0 hover:bg-[#3a3f55] hover:text-[#f7768e] group-hover:opacity-100"
-                onClick={() => {
-                  if (confirm(`「${displayName}」を削除しますか？`)) void deleteWorkspace(ws.id)
-                }}
+                onClick={() => remove(ws.id, displayName)}
                 title="削除"
               >
                 <X size={13} />
@@ -110,8 +135,57 @@ export function WorkspacePanel() {
       </div>
 
       <div className="border-t border-[#2a2e3f] px-3 py-2 text-[10px] text-[#565f89]">
-        ダブルクリックで名前変更 / Ctrl+S で保存
+        右クリックでメニュー / ダブルクリックで名前変更 / Ctrl+S で保存
       </div>
+
+      {menu &&
+        createPortal(
+          <div
+            className="fixed z-[100] min-w-36 rounded-[8px] border border-[#2a2e3f] bg-[#1b1d27] p-1 text-xs text-[#c0caf5] shadow-2xl"
+            style={{ left: menu.x, top: menu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              className="block w-full rounded-[6px] px-3 py-1.5 text-left hover:bg-white/5"
+              onClick={() => {
+                beginRename(menu.id, menu.name)
+                setMenu(null)
+              }}
+            >
+              名前変更
+            </button>
+            <button
+              className="block w-full rounded-[6px] px-3 py-1.5 text-left hover:bg-white/5"
+              onClick={() => {
+                void duplicateWorkspace(menu.id)
+                setMenu(null)
+              }}
+            >
+              複製
+            </button>
+            {menu.isActive && (
+              <button
+                className="block w-full rounded-[6px] px-3 py-1.5 text-left hover:bg-white/5"
+                onClick={() => {
+                  void saveActive()
+                  setMenu(null)
+                }}
+              >
+                保存
+              </button>
+            )}
+            <button
+              className="block w-full rounded-[6px] px-3 py-1.5 text-left text-[#f7768e] hover:bg-white/5"
+              onClick={() => {
+                remove(menu.id, menu.name)
+                setMenu(null)
+              }}
+            >
+              削除
+            </button>
+          </div>,
+          document.body
+        )}
     </aside>
   )
 }

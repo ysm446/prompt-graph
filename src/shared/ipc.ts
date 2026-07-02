@@ -31,6 +31,7 @@ export const IPC = {
   dialogOpenImage: 'dialog:open-image',
   imageMetadata: 'image:metadata',
   imageDataUrl: 'image:dataurl',
+  shellShowItem: 'shell:show-item',
   systemResources: 'system:resources',
   // main -> renderer events
   evtInstallProgress: 'llama:install-progress',

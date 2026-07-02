@@ -70,6 +70,7 @@ const api: PromptGraphApi = {
   imageMetadata: (path: string): Promise<ImageMetadata> =>
     ipcRenderer.invoke(IPC.imageMetadata, path),
   imageDataUrl: (path: string): Promise<string> => ipcRenderer.invoke(IPC.imageDataUrl, path),
+  showItemInFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.shellShowItem, path),
   getSystemResources: (): Promise<SystemResources> => ipcRenderer.invoke(IPC.systemResources),
 
   onInstallProgress: (cb: (p: LlamaInstallProgress) => void): (() => void) => {

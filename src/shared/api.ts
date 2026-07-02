@@ -65,6 +65,7 @@ export interface PromptGraphApi {
   openImageDialog(): Promise<string | null>
   imageMetadata(path: string): Promise<ImageMetadata>
   imageDataUrl(path: string): Promise<string>
+  showItemInFolder(path: string): Promise<void>
   getSystemResources(): Promise<SystemResources>
 
   onInstallProgress(cb: (p: LlamaInstallProgress) => void): () => void

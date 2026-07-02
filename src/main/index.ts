@@ -220,7 +220,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.forgeSdModels, () => listSdModels(forgeBaseUrl()))
   ipcMain.handle(IPC.forgeSamplers, () => listSamplers(forgeBaseUrl()))
   ipcMain.handle(IPC.forgeTxt2img, (_e, params: ForgeTxt2ImgParams) =>
-    txt2img(forgeBaseUrl(), params)
+    txt2img(forgeBaseUrl(), params, join(PATHS.dataDir, 'outputs'), Date.now())
   )
 
   ipcMain.handle(IPC.dialogOpenImage, async () => {
@@ -237,6 +237,10 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.imageMetadata, (_e, path: string) => readImageMetadata(path))
   ipcMain.handle(IPC.imageDataUrl, (_e, path: string) => readImageDataUrl(path))
+
+  ipcMain.handle(IPC.shellShowItem, (_e, path: string) => {
+    if (path) shell.showItemInFolder(path)
+  })
 
   ipcMain.handle(IPC.systemResources, () => getResources())
 }

@@ -22,6 +22,10 @@ import { createNode, scenePinForKind, DEFAULT_NODE_WIDTH } from '../graph/factor
 
 export type RFNode = Node<NodeData, NodeKind>
 
+// コピー/ペースト用クリップボード（セッション内・非永続）。
+let clipboard: { nodes: GraphNode[]; edges: GraphEdge[] } | null = null
+let pasteCount = 0
+
 interface GraphState {
   // workspaces
   workspaces: WorkspaceMeta[]
@@ -41,6 +45,11 @@ interface GraphState {
   addNode: (kind: NodeKind, position: { x: number; y: number }) => void
   updateNodeData: (id: string, patch: Partial<NodeData>) => void
   removeNode: (id: string) => void
+
+  // クリップボード（コピー/ペースト）
+  hasClipboard: boolean
+  copyNodes: (ids: string[]) => void
+  pasteNodes: (at?: { x: number; y: number }) => void
   setSelected: (id: string | null) => void
   setName: (name: string) => void
 
@@ -49,6 +58,7 @@ interface GraphState {
   refreshWorkspaces: () => Promise<void>
   switchWorkspace: (id: string) => Promise<void>
   createWorkspace: () => Promise<void>
+  duplicateWorkspace: (id: string) => Promise<void>
   saveActive: () => Promise<void>
   renameWorkspace: (id: string, name: string) => Promise<void>
   deleteWorkspace: (id: string) => Promise<void>
@@ -153,6 +163,85 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       dirty: true
     })),
 
+  hasClipboard: false,
+
+  copyNodes: (ids) => {
+    const idSet = new Set(ids)
+    const sel = get().nodes.filter((n) => idSet.has(n.id))
+    if (sel.length === 0) return
+    clipboard = {
+      nodes: sel.map((n) => ({
+        id: n.id,
+        kind: n.type as NodeKind,
+        position: { ...n.position },
+        data: JSON.parse(JSON.stringify(n.data)) as NodeData,
+        width: n.width,
+        height: n.height
+      })),
+      // コピー対象ノード同士を結ぶエッジのみ複製する
+      edges: get()
+        .edges.filter((e) => idSet.has(e.source) && idSet.has(e.target))
+        .map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle ?? null,
+          targetHandle: e.targetHandle ?? null
+        }))
+    }
+    pasteCount = 0
+    set({ hasClipboard: true })
+  },
+
+  pasteNodes: (at) =>
+    set((s) => {
+      if (!clipboard || clipboard.nodes.length === 0) return {}
+      const idMap = new Map<string, string>()
+      clipboard.nodes.forEach((n) => idMap.set(n.id, nanoid(8)))
+
+      // 配置オフセット: at 指定ならグループ左上をそこへ、無ければ少しずらして重ねる
+      let dx = 0
+      let dy = 0
+      if (at) {
+        const minX = Math.min(...clipboard.nodes.map((n) => n.position.x))
+        const minY = Math.min(...clipboard.nodes.map((n) => n.position.y))
+        dx = at.x - minX
+        dy = at.y - minY
+      } else {
+        pasteCount += 1
+        dx = dy = 30 * pasteCount
+      }
+
+      const newNodes = clipboard.nodes.map((n) => {
+        const rf = toRFNode({
+          id: idMap.get(n.id) as string,
+          kind: n.kind,
+          position: { x: n.position.x + dx, y: n.position.y + dy },
+          data: JSON.parse(JSON.stringify(n.data)) as NodeData,
+          width: n.width,
+          height: n.height
+        })
+        return { ...rf, selected: true }
+      })
+      const newEdges: Edge[] = clipboard.edges
+        .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+        .map((e) => ({
+          id: nanoid(8),
+          source: idMap.get(e.source) as string,
+          target: idMap.get(e.target) as string,
+          sourceHandle: e.sourceHandle ?? null,
+          targetHandle: e.targetHandle ?? null,
+          selected: true
+        }))
+
+      return {
+        nodes: [...s.nodes.map((n) => ({ ...n, selected: false })), ...newNodes],
+        edges: [...s.edges, ...newEdges],
+        selectedId: newNodes[0]?.id ?? s.selectedId,
+        dirty: true
+      }
+    }),
+
   setSelected: (id) => set({ selectedId: id }),
   setName: (name) => set({ name, dirty: true }),
 
@@ -192,6 +281,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const n = get().workspaces.length + 1
     const created = await window.api.createWorkspace(`workspace ${n}`)
     set(applySnapshot(created))
+    await get().refreshWorkspaces()
+  },
+
+  duplicateWorkspace: async (id) => {
+    const { activeId, dirty } = get()
+    if (activeId && dirty) await get().saveActive()
+    // 複製元の内容を取得（アクティブは現在の状態、それ以外はディスクから）
+    const src = id === get().activeId ? snapshotOf(get()) : await window.api.loadWorkspace(id)
+    if (!src) return
+    const created = await window.api.createWorkspace(`${src.name} のコピー`)
+    const filled: ProjectSnapshot = { ...created, nodes: src.nodes, edges: src.edges }
+    await window.api.saveWorkspace(filled)
+    set(applySnapshot(filled)) // 複製先へ切り替え
     await get().refreshWorkspaces()
   },
 

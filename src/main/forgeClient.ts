@@ -1,5 +1,7 @@
 // WebUI Forge の REST API クライアント（/sdapi/v1/*）。
 // Forge 2 でも --api 付き起動なら REST が使えることを実機確認済み。
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { ForgeSdModel, ForgeTxt2ImgParams, ForgeTxt2ImgResult } from '../shared/types'
 
 async function getJson<T>(url: string): Promise<T> {
@@ -22,7 +24,9 @@ export async function listSamplers(baseUrl: string): Promise<string[]> {
 
 export async function txt2img(
   baseUrl: string,
-  params: ForgeTxt2ImgParams
+  params: ForgeTxt2ImgParams,
+  outputDir: string,
+  stamp: number
 ): Promise<ForgeTxt2ImgResult> {
   const body: Record<string, unknown> = {
     prompt: params.prompt,
@@ -64,5 +68,10 @@ export async function txt2img(
     /* noop */
   }
 
-  return { imageDataUrl: `data:image/png;base64,${b64}`, seed }
+  // PNG をディスクに保存（ワークスペースにはこのパスだけを残す）。
+  await mkdir(outputDir, { recursive: true })
+  const savedPath = join(outputDir, `render-${stamp}${seed != null ? `-${seed}` : ''}.png`)
+  await writeFile(savedPath, Buffer.from(b64, 'base64'))
+
+  return { imageDataUrl: `data:image/png;base64,${b64}`, seed, savedPath }
 }

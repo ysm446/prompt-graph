@@ -1,5 +1,6 @@
 import { Handle, NodeResizeControl, Position, type NodeProps } from '@xyflow/react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Boxes,
   Camera as CameraIcon,
@@ -162,22 +163,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 const inputCls =
   'nodrag rounded-[8px] border border-[var(--border)] bg-[var(--bg-input)] px-2 py-1 text-xs text-[var(--text)] outline-none placeholder:text-[var(--text-faint)] focus:border-[var(--accent-border)]'
 
-function TextInput(props: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-}) {
-  return (
-    <input
-      className={inputCls}
-      value={props.value}
-      placeholder={props.placeholder}
-      onChange={(e) => props.onChange(e.target.value)}
-    />
-  )
-}
-
 // 内容に合わせて高さが自動で伸びる textarea（内部スクロールバーを出さず、ノードごと縦に伸びる）
+// 単一行相当のフィールドも幅を超えたら折り返すよう、全ノードでこの Area を使う。
 function Area(props: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null)
   useLayoutEffect(() => {
@@ -220,7 +207,7 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
   return (
     <Shell id={id} kind="character" title={d.label} selected={selected}>
       <Field label="数え名詞 (人数タグ集計用 / 空で無効)">
-        <TextInput
+        <Area
           value={d.person ?? 'girl'}
           onChange={(v) => update({ person: v })}
           placeholder="girl, boy, guy, dog…"
@@ -230,19 +217,19 @@ export function CharacterNode({ id, data, selected }: NodeProps<RFNode>) {
         <Area value={d.face} onChange={(v) => update({ face: v })} placeholder="smile, blue eyes" />
       </Field>
       <Field label="髪">
-        <TextInput value={d.hair} onChange={(v) => update({ hair: v })} placeholder="long hair, blonde" />
+        <Area value={d.hair} onChange={(v) => update({ hair: v })} placeholder="long hair, blonde" />
       </Field>
       <Field label="上半身">
-        <TextInput value={d.upper} onChange={(v) => update({ upper: v })} placeholder="white shirt" />
+        <Area value={d.upper} onChange={(v) => update({ upper: v })} placeholder="white shirt" />
       </Field>
       <Field label="下半身">
-        <TextInput value={d.lower} onChange={(v) => update({ lower: v })} placeholder="black skirt" />
+        <Area value={d.lower} onChange={(v) => update({ lower: v })} placeholder="black skirt" />
       </Field>
       <Field label="全身">
-        <TextInput value={d.fullbody} onChange={(v) => update({ fullbody: v })} placeholder="dress" />
+        <Area value={d.fullbody} onChange={(v) => update({ fullbody: v })} placeholder="dress" />
       </Field>
       <Field label="小物">
-        <TextInput value={d.accessory} onChange={(v) => update({ accessory: v })} placeholder="glasses" />
+        <Area value={d.accessory} onChange={(v) => update({ accessory: v })} placeholder="glasses" />
       </Field>
       <Field label="weight">
         <WeightInput value={d.weight} onChange={(v) => update({ weight: v })} />
@@ -333,12 +320,12 @@ export function SeedNode({ id, data, selected }: NodeProps<RFNode>) {
       </Field>
       {mode === 'fixed' && (
         <Field label="seed (-1=ランダム)">
-          <TextInput value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
+          <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="-1" />
         </Field>
       )}
       {mode === 'list' && (
         <Field label="seed リスト">
-          <TextInput value={d.value} onChange={(v) => update({ value: v })} placeholder="1, 2, 3" />
+          <Area value={d.value} onChange={(v) => update({ value: v })} placeholder="1, 2, 3" />
         </Field>
       )}
       {mode === 'increment' && (
@@ -521,7 +508,7 @@ export function SceneNode({ id, data, selected }: NodeProps<RFNode>) {
         </label>
       ) : (
         <Field label="人数タグ">
-          <TextInput value={d.peopleTag} onChange={(v) => update({ peopleTag: v })} placeholder="1girl, 1boy" />
+          <Area value={d.peopleTag} onChange={(v) => update({ peopleTag: v })} placeholder="1girl, 1boy" />
         </Field>
       )}
       <label className="flex items-center gap-2 text-[10px] text-[var(--text-faint)]">
@@ -822,12 +809,29 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
   const [note, setNote] = useState<string | null>(null) // 起動中などの一時メッセージ
   const [err, setErr] = useState<string | null>(null)
   const [img, setImg] = useState<string | null>(null) // data URL（非永続）
-  const [seed, setSeed] = useState<number | null>(null)
+  const [seed, setSeed] = useState<number | null>(d.lastSeed ?? null)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     window.api.getForgeStatus().then(setForge)
     return window.api.onForgeStatus(setForge)
   }, [])
+
+  // 保存済み画像パスから再表示（起動直後・ワークスペース切替時）
+  useEffect(() => {
+    if (!d.lastImagePath) {
+      setImg(null)
+      return
+    }
+    let alive = true
+    window.api
+      .imageDataUrl(d.lastImagePath)
+      .then((u) => alive && setImg(u))
+      .catch(() => alive && setImg(null))
+    return () => {
+      alive = false
+    }
+  }, [d.lastImagePath])
 
   const running = forge.state === 'running'
   useEffect(() => {
@@ -835,6 +839,14 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
     window.api.forgeSdModels().then(setModels).catch(() => setModels([]))
     window.api.forgeSamplers().then(setSamplers).catch(() => setSamplers([]))
   }, [running])
+
+  // 画像コンテキストメニューの外側クリックで閉じる
+  useEffect(() => {
+    if (!menu) return
+    const close = (): void => setMenu(null)
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [menu])
 
   async function generate() {
     setErr(null)
@@ -871,6 +883,8 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       })
       setImg(res.imageDataUrl)
       setSeed(res.seed)
+      // 次回起動時の再表示用にパスと seed をノードへ保存
+      update({ lastImagePath: res.savedPath, lastSeed: res.seed })
     } catch (e) {
       setErr((e as Error).message)
     } finally {
@@ -947,10 +961,36 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
             src={img}
             alt="生成結果"
             className="w-full rounded-[10px] border border-[var(--border-strong)] bg-black/20 object-contain"
+            onContextMenu={(e) => {
+              if (!d.lastImagePath) return
+              e.preventDefault()
+              e.stopPropagation()
+              setMenu({ x: e.clientX, y: e.clientY })
+            }}
           />
           {seed != null && <span className="text-[10px] text-[var(--text-faint)]">seed: {seed}</span>}
         </div>
       )}
+
+      {menu &&
+        createPortal(
+          <div
+            className="fixed z-[100] min-w-44 rounded-[8px] border border-[var(--border-strong)] bg-[var(--bg-card)] p-1 text-xs shadow-2xl"
+            style={{ left: menu.x, top: menu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              className="block w-full rounded-[6px] px-3 py-1.5 text-left text-[var(--text-dim)] hover:bg-white/5 hover:text-[var(--text)]"
+              onClick={() => {
+                window.api.showItemInFolder(d.lastImagePath)
+                setMenu(null)
+              }}
+            >
+              画像の保存場所を開く
+            </button>
+          </div>,
+          document.body
+        )}
     </Shell>
   )
 }

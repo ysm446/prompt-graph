@@ -106,6 +106,8 @@ export type RenderData = {
   cfg: number
   width: number
   height: number
+  lastImagePath: string // 直近生成画像の保存先（次回起動時の再表示用。画像本体は保存しない）
+  lastSeed: number | null // 直近生成の実 seed
 }
 
 export type SceneData = {
@@ -303,4 +305,5 @@ export interface ForgeTxt2ImgParams {
 export interface ForgeTxt2ImgResult {
   imageDataUrl: string // data:image/png;base64,...
   seed: number | null
+  savedPath: string // 保存された PNG の絶対パス
 }
