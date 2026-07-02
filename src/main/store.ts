@@ -99,14 +99,22 @@ export class Store {
         _sort: birthtimeMs || mtimeMs // 未登録分のフォールバック順（作成順）
       })
     }
-    // 明示順(workspace-order.json)を優先し、未登録は作成順で後ろに付ける
+    // 並びは明示リスト(workspace-order.json)で完全管理する（mtime/birthtime に依存しない）。
+    // 未登録（新規/旧データ）は作成順で末尾に追記して確定させ、以後は不変にする。
     const order = await this.readJson<string[]>(this.path('workspace-order.json'), [])
-    const rank = new Map(order.map((id, i) => [id, i]))
-    metas.sort((a, b) => {
-      const ai = rank.has(a.id) ? (rank.get(a.id) as number) : Infinity
-      const bi = rank.has(b.id) ? (rank.get(b.id) as number) : Infinity
-      return ai !== bi ? ai - bi : a._sort - b._sort
-    })
+    const existing = new Set(metas.map((m) => m.id))
+    const kept = order.filter((id) => existing.has(id)) // 消えた ID を除去
+    const appended = metas
+      .filter((m) => !order.includes(m.id))
+      .sort((a, b) => a._sort - b._sort) // 初回配置のみ作成順
+      .map((m) => m.id)
+    const effective = [...kept, ...appended]
+    // 変化があれば永続化（自己修復。以後は選択・保存で並びが変わらない）
+    if (effective.length !== order.length || effective.some((id, i) => order[i] !== id)) {
+      await this.saveWorkspaceOrder(effective)
+    }
+    const rank = new Map(effective.map((id, i) => [id, i]))
+    metas.sort((a, b) => (rank.get(a.id) as number) - (rank.get(b.id) as number))
     return metas.map(({ _sort, ...m }) => m)
   }
 
