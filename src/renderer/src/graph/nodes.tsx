@@ -753,6 +753,37 @@ export function BatchNode({ id, data, selected }: NodeProps<RFNode>) {
   )
 }
 
+// Forge が running になるまで待つ（起動失敗/停止/タイムアウトで reject）。
+function waitForForgeRunning(timeoutMs = 20 * 60 * 1000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let done = false
+    let off: () => void = () => {}
+    const timer = setTimeout(() => {
+      if (done) return
+      done = true
+      off()
+      reject(new Error('Forge の起動がタイムアウトしました'))
+    }, timeoutMs)
+    const finish = (err?: Error): void => {
+      if (done) return
+      done = true
+      off()
+      clearTimeout(timer)
+      err ? reject(err) : resolve()
+    }
+    const check = (s: ForgeServerStatus): void => {
+      if (s.state === 'running') finish()
+      else if (s.state === 'error') finish(new Error(s.message ?? 'Forge の起動に失敗しました'))
+      else if (s.state === 'stopped') finish(new Error('Forge が停止しました'))
+    }
+    off = window.api.onForgeStatus(check)
+    // 既に running の場合の取りこぼし防止
+    window.api.getForgeStatus().then((s) => {
+      if (s.state === 'running') finish()
+    })
+  })
+}
+
 // Render: 接続した Scene を Forge (txt2img) で生成する。生成画像は永続化しない。
 function NumField({
   label,
@@ -788,6 +819,7 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
   const [models, setModels] = useState<{ title: string; modelName: string }[]>([])
   const [samplers, setSamplers] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null) // 起動中などの一時メッセージ
   const [err, setErr] = useState<string | null>(null)
   const [img, setImg] = useState<string | null>(null) // data URL（非永続）
   const [seed, setSeed] = useState<number | null>(null)
@@ -819,6 +851,13 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
     }
     setBusy(true)
     try {
+      // 未起動なら起動して稼働まで待つ（初回は venv/torch 構築で長い）
+      if (forge.state !== 'running') {
+        setNote('Forge を起動中…')
+        await window.api.startForge()
+        await waitForForgeRunning()
+        setNote(null)
+      }
       const s = compiled.seed && Number.isFinite(Number(compiled.seed)) ? Number(compiled.seed) : -1
       const res = await window.api.forgeTxt2img({
         prompt: compiled.positive,
@@ -836,6 +875,7 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       setErr((e as Error).message)
     } finally {
       setBusy(false)
+      setNote(null)
     }
   }
 
@@ -889,12 +929,16 @@ export function RenderNode({ id, data, selected }: NodeProps<RFNode>) {
       <button
         className="nodrag flex items-center justify-center gap-1.5 rounded-[10px] bg-[rgba(68,54,124,0.96)] py-1.5 text-xs font-medium text-white hover:bg-[rgba(82,66,146,0.98)] disabled:opacity-40"
         onClick={generate}
-        disabled={busy || !running}
+        disabled={busy}
       >
         {busy ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-        {busy ? '生成中…' : '画像生成'}
+        {note ?? (busy ? '生成中…' : '画像生成')}
       </button>
-      {!running && <span className="text-[10px] text-[#e0af68]">Forge を起動してください</span>}
+      {!running && !busy && (
+        <span className="text-[10px] text-[var(--text-faint)]">
+          Forge 未起動（生成時に自動起動します。初回は数分かかります）
+        </span>
+      )}
       {err && <span className="text-[10px] text-[var(--danger)]">{err}</span>}
 
       {img && (

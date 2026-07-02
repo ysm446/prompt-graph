@@ -32,6 +32,13 @@ export function SettingsPanel() {
     setSaved(false)
   }
 
+  // トグル類は即保存（ポップオーバーは外側クリックで閉じるため、保存ボタン待ちだと失われる）
+  const updateAndSave = (patch: Partial<AppSettings>) => {
+    const next = { ...settings, ...patch }
+    setSettings(next)
+    window.api.saveSettings(next).then(() => window.dispatchEvent(new Event('pg-settings')))
+  }
+
   async function save() {
     if (!settings) return
     await window.api.saveSettings(settings)
@@ -48,7 +55,7 @@ export function SettingsPanel() {
         <input
           type="checkbox"
           checked={settings.showResources}
-          onChange={(e) => update({ showResources: e.target.checked })}
+          onChange={(e) => updateAndSave({ showResources: e.target.checked })}
         />
         システムリソースを表示（CPU / RAM / GPU）
       </label>
@@ -57,7 +64,7 @@ export function SettingsPanel() {
         <input
           type="checkbox"
           checked={settings.showMinimap}
-          onChange={(e) => update({ showMinimap: e.target.checked })}
+          onChange={(e) => updateAndSave({ showMinimap: e.target.checked })}
         />
         ミニマップを表示
       </label>
@@ -66,7 +73,7 @@ export function SettingsPanel() {
         <input
           type="checkbox"
           checked={settings.snapToGrid}
-          onChange={(e) => update({ snapToGrid: e.target.checked })}
+          onChange={(e) => updateAndSave({ snapToGrid: e.target.checked })}
         />
         ノードをグリッドにスナップ（移動・リサイズ）
       </label>

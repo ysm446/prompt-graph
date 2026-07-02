@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, Cpu, ImageIcon, Loader2, RefreshCw, Settings } from 'lucide-react'
-import type { LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
+import type { ForgeServerStatus, LlamaInstall, LlamaModel, LlamaServerStatus } from '@shared/types'
 import { RuntimeInstall } from './RuntimeInstall'
 import { ForgePanel } from './ForgePanel'
 import { SettingsPanel } from './SettingsPanel'
@@ -21,6 +21,11 @@ export function ModelBar() {
     modelPath: null,
     message: null
   })
+  const [forgeStatus, setForgeStatus] = useState<ForgeServerStatus>({
+    state: 'stopped',
+    url: null,
+    message: null
+  })
   const [busy, setBusy] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showRuntime, setShowRuntime] = useState(false)
@@ -34,8 +39,14 @@ export function ModelBar() {
   useEffect(() => {
     window.api.getInstall().then(setInstall)
     window.api.getServerStatus().then(setStatus)
+    window.api.getForgeStatus().then(setForgeStatus)
     void refreshModels()
-    return window.api.onServerStatus(setStatus)
+    const offServer = window.api.onServerStatus(setStatus)
+    const offForge = window.api.onForgeStatus(setForgeStatus)
+    return () => {
+      offServer()
+      offForge()
+    }
   }, [])
 
   // ランタイムポップオーバーの外側クリックで閉じる
@@ -184,12 +195,35 @@ export function ModelBar() {
 
         <div className="relative" ref={forgeRef}>
           <button
-            className="flex items-center gap-1 rounded-[8px] border border-[var(--border-strong)] px-2 py-1 text-[var(--text-dim)] transition hover:bg-white/5 hover:text-[var(--text)]"
+            className={`flex items-center gap-1 rounded-[8px] border px-2 py-1 transition hover:bg-white/5 ${
+              forgeStatus.state === 'running'
+                ? 'border-[#9ece6a] bg-[rgba(158,206,106,0.12)] text-[#9ece6a]'
+                : forgeStatus.state === 'starting'
+                  ? 'animate-pulse border-[#e0af68] bg-[rgba(224,175,104,0.12)] text-[#e0af68]'
+                  : forgeStatus.state === 'error'
+                    ? 'border-[var(--danger)] text-[var(--danger)]'
+                    : 'border-[var(--border-strong)] text-[var(--text-dim)] hover:text-[var(--text)]'
+            }`}
             onClick={() => setShowForge((v) => !v)}
-            title="WebUI Forge"
+            title={
+              forgeStatus.state === 'running'
+                ? `WebUI Forge 稼働中 (${forgeStatus.url ?? ''})`
+                : forgeStatus.state === 'starting'
+                  ? 'WebUI Forge 起動中…'
+                  : forgeStatus.state === 'error'
+                    ? `WebUI Forge エラー: ${forgeStatus.message ?? ''}`
+                    : 'WebUI Forge'
+            }
           >
-            <ImageIcon size={13} />
+            {forgeStatus.state === 'starting' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <ImageIcon size={13} />
+            )}
             Forge
+            {forgeStatus.state === 'running' && (
+              <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[#9ece6a]" />
+            )}
           </button>
           {showForge && (
             <div className="absolute right-0 top-full z-50 mt-1 rounded-xl border border-[var(--border-strong)] bg-[var(--bg-card)] p-3 shadow-2xl">
